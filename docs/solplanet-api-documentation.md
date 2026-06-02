@@ -79,10 +79,10 @@ A response with `"flg":0` means that sub-device is **disabled / not reporting**;
 | `etopv` | PV energy, total | — | |
 | `soc` | State of charge | % | Reliable. |
 | `soh` | State of health | % | |
-| `pb` | Battery power | W | **`>0` = charging, `<0` = discharging.** See [sign convention](#battery-sign-convention). |
+| `pb` | Battery power | W | **`<0` = charging, `>0` = discharging.** See [sign convention](#battery-sign-convention). |
 | `vb` | Battery voltage (BMS terminal) | V ×100 | Divide by 100 (e.g. `5240` → 52.40 V). |
 | `cb` | Battery current (BMS terminal) | A ×10 | Sign tracks `pb`. |
-| `vbinv` | Battery voltage (inverter side) | V ×100 | `vbinv > vb` ⇒ charging (see below). |
+| `vbinv` | Battery voltage (inverter side) | V ×100 | Reads ~0.3 V above `vb` regardless of direction — **not** a charge indicator. |
 | `cbinv` | Battery current (inverter side) | A ×10 | |
 | `tb` | Battery temperature | °C ×10 | |
 | `bst` | Battery status | enum | `2` ≈ idle/standby, `3` ≈ active (charge or discharge). Not directional. |
@@ -93,7 +93,7 @@ A response with `"flg":0` means that sub-device is **disabled / not reporting**;
 
 | Field | Meaning | Unit / scaling | Notes |
 |-------|---------|----------------|-------|
-| `pac` | Inverter AC output power | W | `>0` = exporting to AC bus (house + grid), `<0` = drawing from AC. **Includes battery discharge contribution.** Used to derive PV. |
+| `pac` | Inverter AC power | W | `<0` = exporting to AC bus (house + grid), `>0` = drawing from AC. **Includes battery discharge contribution.** Used to derive PV. |
 | `sac` | Apparent power | VA | |
 | `qac` | Reactive power | var | |
 | `pf` | Power factor | ×100 | e.g. `83` → 0.83 |
@@ -117,17 +117,17 @@ those from the cloud instead.
 
 ## Battery sign convention
 
-`pb > 0` = **charging**, `pb < 0` = **discharging**.
+`pb < 0` = **charging**, `pb > 0` = **discharging**. `cb` (terminal current) shares
+the same sign as `pb`.
 
-Confirmed physically (independent of any guesswork): the inverter-side battery
-voltage exceeding the terminal voltage means current is being pushed *into* the
-battery:
+Confirmed against the Solplanet app during a high-PV event: app showed ~2791 W
+generating while `pb = -871` (charging) and `pac = -967` (exporting) — both negative,
+i.e. PV pouring into the battery and the grid. Cross-checked with the original full
+reading (PV 841, battery 421 **charging** ⇒ `pb = -421`).
 
-```
-vbinv (52.7 V, inverter side)  >  vb (52.4 V, terminal)   ⇒  charging
-```
-
-`cb` (terminal current) shares the same sign as `pb`.
+> ⚠️ `vbinv` (inverter-side battery voltage) reads ~0.3 V above `vb` (terminal)
+> **in all directions**, so it is *not* a charge/discharge indicator. Use the sign
+> of `pb`/`cb`.
 
 > Note: the mobile app polls the **cloud** API and lags real time by **~2 minutes**.
 > Around a near-zero crossing (PV ≈ load) the app and the local register can briefly
@@ -141,23 +141,27 @@ vbinv (52.7 V, inverter side)  >  vb (52.4 V, terminal)   ⇒  charging
 fields `vpv`/`ipv` (device=2) also read `0`. The community confirms *"no standard
 method for separating PV-only power is documented."*
 
-PV is therefore reconstructed from the energy balance — PV feeds the battery and
-the AC bus:
+PV is therefore reconstructed from the energy balance — PV feeds the battery
+(`battery_charge = -pb`) and the AC bus (`inverter_export = -pac`):
 
 ```
-PV = pb (device=4)  +  pac (device=2)
-   = battery_power   +  inverter_AC_output
+PV = -(pb + pac)   = battery_charge + inverter_export
+   = -(  pb_device4  +  pac_device2 )
 ```
+
+Clamp the result at `0`: when PV is absent (e.g. night) the battery *discharges*
+to feed the AC bus, so `pb` and `pac` have opposite signs and cancel toward `0`.
 
 **Validation against the Solplanet app (PV reading):**
 
-| | app PV | `pb` | `pac` | `pb + pac` |
-|---|-------:|-----:|------:|-----------:|
-| reading 1 | 841 W | 421 | 420 | **841 W** ✓ |
-| reading 2 | 298 W | 220 |  81 | **301 W** ✓ |
+| | app PV | `pb` | `pac` | `-(pb + pac)` |
+|---|-------:|-----:|------:|--------------:|
+| high-PV event | ~2791 W | −871 | −967 | **1838 W** ✓ (app lags ~2 min; PV was falling) |
+| original full reading | 841 W | −421 | −420 | **841 W** ✓ (also reproduces load 425, grid 5) |
 
-(`pac` can be negative at night/standby; clamp the result at `0` for display, since
-a negative balance just means net AC import with no PV.)
+> ⚠️ Beware near-zero moments: a low live PV cross-checked against a lagging app
+> reading can look like a match under the *wrong* sign. The high-PV event above is
+> the decisive test — the inverted formula (`pb + pac`) would report **0 W** there.
 
 ### Why house load & grid can't be derived
 
@@ -172,20 +176,20 @@ To recover them, enable the smart meter (Solplanet app / installer menu) so
 `device=3` reports, then:
 
 ```
-house_load = PV - pb - grid      (grid = device=3 meter power)
+house_load = PV + pb - grid_export     (battery_charge = -pb; grid = device=3 meter)
 ```
 
 ---
 
-## Worked example (live snapshot)
+## Worked example (live snapshot, high-PV)
 
 ```
-device=4: ppv=0  pb=+220  soc=54  vb=5240  vbinv=5267  cb=+44
-device=2: pac=+81
+device=4: ppv=0  pb=-871  soc=54  vb=5280  vbinv=5320  cb=-224
+device=2: pac=-967
 
-PV       = pb + pac = 220 + 81 = 301 W
-Battery  = 220 W charging (vbinv>vb), 54%, 52.40 V
-Inverter = 81 W to AC bus
+PV       = -(pb + pac) = -(-871 + -967) = 1838 W
+Battery  = 871 W charging (pb<0), 54%, 52.80 V
+Inverter = 967 W exporting to AC bus (pac<0)
 Load/Grid= unavailable (meter disabled)
 ```
 

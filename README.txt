@@ -1,4 +1,7 @@
 
+Full API reference: ./docs/solplanet-api-documentation.md
+Live status script:  ./scripts/battery_status.sh  (add --watch for live refresh)
+
 How to query battery usage:
 
 ➜  /tmp curl -s -k "https://192.168.4.30/getdevdata.cgi?device=4&sn=AL010K5SQ2620429"

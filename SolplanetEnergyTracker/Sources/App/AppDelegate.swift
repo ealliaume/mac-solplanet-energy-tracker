@@ -29,6 +29,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         seedInverterFromEnvironmentIfNeeded()
         installStatusItem()
         startPolling()
+
+        // Re-render the label immediately when the user edits the display options.
+        NotificationCenter.default.addObserver(
+            forName: .menuBarDisplayOptionsChanged, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.refreshTitle() }
+        }
     }
 
     func applicationWillTerminate(_ notification: Notification) {
@@ -40,7 +47,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func installStatusItem() {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        item.button?.title = store.menuBarText
+        item.button?.title = menuBarTitle()
         item.button?.target = self
         item.button?.action = #selector(togglePopover)
         statusItem = item
@@ -59,7 +66,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func refreshTitle() {
-        statusItem?.button?.title = store.menuBarText
+        statusItem?.button?.title = menuBarTitle()
+    }
+
+    private func menuBarTitle() -> String {
+        MenuBarSummary.text(for: store.primary, options: preferences.menuBarDisplayOptions)
     }
 
     @objc private func togglePopover() {

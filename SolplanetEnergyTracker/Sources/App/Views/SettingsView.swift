@@ -113,6 +113,7 @@ private struct GeneralSettingsView: View {
     @State private var interval: Double = PollingLimits.defaultRefreshInterval
     @State private var launchAtLogin = false
     @State private var launchError: String?
+    @State private var menuOptions = MenuBarDisplayOptions.default
 
     var body: some View {
         Form {
@@ -130,6 +131,20 @@ private struct GeneralSettingsView: View {
                 }
             }
 
+            Section("Menu bar") {
+                Toggle("PV", isOn: $menuOptions.showPV)
+                Picker("Battery", selection: $menuOptions.battery) {
+                    ForEach(MenuBarDisplayOptions.BatteryDisplay.allCases) { Text($0.title).tag($0) }
+                }
+                Toggle("Load", isOn: $menuOptions.showLoad)
+                Toggle("Grid", isOn: $menuOptions.showGrid)
+                Toggle("Inverter temperature", isOn: $menuOptions.showTemperature)
+            }
+            .onChange(of: menuOptions) { _, newValue in
+                preferences.menuBarDisplayOptions = newValue
+                NotificationCenter.default.post(name: .menuBarDisplayOptionsChanged, object: nil)
+            }
+
             Section("Startup") {
                 Toggle("Start automatically at login", isOn: $launchAtLogin)
                     .onChange(of: launchAtLogin) { _, newValue in updateLaunchAtLogin(newValue) }
@@ -145,6 +160,7 @@ private struct GeneralSettingsView: View {
         .onAppear {
             interval = preferences.refreshIntervalSeconds
             launchAtLogin = LaunchAtLoginService.shared.isEnabled
+            menuOptions = preferences.menuBarDisplayOptions
         }
     }
 

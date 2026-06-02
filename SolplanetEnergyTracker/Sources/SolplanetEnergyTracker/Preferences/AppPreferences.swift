@@ -9,6 +9,14 @@ public protocol AppPreferences: AnyObject, Sendable {
     var inverters: [ConnectionSettings] { get set }
     /// Poll cadence; always read back clamped to the 5 s floor.
     var refreshIntervalSeconds: TimeInterval { get set }
+    /// Which metrics the menu-bar label shows.
+    var menuBarDisplayOptions: MenuBarDisplayOptions { get set }
+}
+
+public extension Notification.Name {
+    /// Posted after `menuBarDisplayOptions` changes so the menu bar re-renders
+    /// immediately rather than waiting for the next poll.
+    static let menuBarDisplayOptionsChanged = Notification.Name("solplanet-tracker.menuBarDisplayOptionsChanged")
 }
 
 public extension AppPreferences {
@@ -31,6 +39,7 @@ public final class UserDefaultsAppPreferences: AppPreferences, @unchecked Sendab
     private enum Key {
         static let inverters = "solplanet-tracker.connection.inverters"
         static let refreshInterval = "solplanet-tracker.refreshIntervalSeconds"
+        static let menuBarDisplayOptions = "solplanet-tracker.menuBarDisplayOptions"
     }
 
     /// Process-wide instance shared by the poll pipeline (AppDelegate) and the
@@ -62,5 +71,19 @@ public final class UserDefaultsAppPreferences: AppPreferences, @unchecked Sendab
         }
         // Clamp on the way in too — never trust a caller to honour the floor.
         set { defaults.set(PollingLimits.clamp(newValue), forKey: Key.refreshInterval) }
+    }
+
+    public var menuBarDisplayOptions: MenuBarDisplayOptions {
+        get {
+            guard let data = defaults.data(forKey: Key.menuBarDisplayOptions),
+                  let decoded = try? decoder.decode(MenuBarDisplayOptions.self, from: data) else {
+                return .default
+            }
+            return decoded
+        }
+        set {
+            guard let data = try? encoder.encode(newValue) else { return }
+            defaults.set(data, forKey: Key.menuBarDisplayOptions)
+        }
     }
 }

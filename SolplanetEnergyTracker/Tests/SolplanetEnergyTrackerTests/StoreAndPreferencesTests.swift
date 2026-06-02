@@ -25,8 +25,36 @@ final class FormattingTests: XCTestCase {
         XCTAssertEqual(MenuBarSummary.text(for: nil), AppInfo.unconfiguredLabel)
     }
 
-    func testMenuBarSummaryLiveReading() {
-        XCTAssertEqual(MenuBarSummary.text(for: sampleReading()), "☀ 486 W  🔋 24%")
+    func testMenuBarSummaryDefaultOptions() {
+        // PV on, battery both (charging → ↑), load on (rough → ≈), grid/temp off.
+        XCTAssertEqual(MenuBarSummary.text(for: sampleReading()),
+                       "☀ 486 W  🔋↑ 358 W 24%  🏠≈ 128 W")
+    }
+
+    func testMenuBarSummaryBatteryPercentOnly() {
+        let options = MenuBarDisplayOptions(showPV: false, battery: .percent, showLoad: false)
+        XCTAssertEqual(MenuBarSummary.text(for: sampleReading(), options: options), "🔋 24%")
+    }
+
+    func testMenuBarSummaryBatteryWattOnly() {
+        let options = MenuBarDisplayOptions(showPV: false, battery: .watt, showLoad: false)
+        XCTAssertEqual(MenuBarSummary.text(for: sampleReading(), options: options), "🔋↑ 358 W")
+    }
+
+    func testMenuBarSummaryBatteryHidden() {
+        let options = MenuBarDisplayOptions(showPV: true, battery: .none, showLoad: false)
+        XCTAssertEqual(MenuBarSummary.text(for: sampleReading(), options: options), "☀ 486 W")
+    }
+
+    func testMenuBarSummaryGridShownAsUnavailable() {
+        let options = MenuBarDisplayOptions(showPV: false, battery: .none, showLoad: false, showGrid: true)
+        XCTAssertEqual(MenuBarSummary.text(for: sampleReading(), options: options), "⚡ n/a")
+    }
+
+    func testMenuBarSummaryAllOffKeepsMinimalMark() {
+        let options = MenuBarDisplayOptions(showPV: false, battery: .none, showLoad: false,
+                                            showGrid: false, showTemperature: false)
+        XCTAssertEqual(MenuBarSummary.text(for: sampleReading(), options: options), "☀")
     }
 
     func testMenuBarSummaryFlagsOffline() {
@@ -49,7 +77,7 @@ final class ReadingsStoreTests: XCTestCase {
         let store = ReadingsStore()
         XCTAssertEqual(store.menuBarText, AppInfo.unconfiguredLabel)
         store.update(sampleReading())
-        XCTAssertEqual(store.menuBarText, "☀ 486 W  🔋 24%")
+        XCTAssertEqual(store.menuBarText, "☀ 486 W  🔋↑ 358 W 24%  🏠≈ 128 W")
     }
 }
 
@@ -70,6 +98,20 @@ final class PreferencesTests: XCTestCase {
     func testDefaultIntervalWhenUnset() throws {
         let prefs = try freshPreferences()
         XCTAssertGreaterThanOrEqual(prefs.refreshIntervalSeconds, 5)
+    }
+
+    func testMenuBarDisplayOptionsDefaultAndRoundTrip() throws {
+        let prefs = try freshPreferences()
+        // Default: PV on, battery both, load on, grid off, temp off.
+        XCTAssertEqual(prefs.menuBarDisplayOptions, .default)
+        XCTAssertFalse(prefs.menuBarDisplayOptions.showGrid)
+        XCTAssertFalse(prefs.menuBarDisplayOptions.showTemperature)
+
+        prefs.menuBarDisplayOptions = MenuBarDisplayOptions(showPV: false, battery: .percent,
+                                                            showLoad: false, showGrid: true,
+                                                            showTemperature: true)
+        XCTAssertEqual(prefs.menuBarDisplayOptions.battery, .percent)
+        XCTAssertTrue(prefs.menuBarDisplayOptions.showGrid)
     }
 
     func testPrimaryInverterRoundTrips() throws {

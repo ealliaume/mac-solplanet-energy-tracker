@@ -14,8 +14,9 @@ struct SettingsView: View {
             GeneralSettingsView(preferences: preferences)
                 .tabItem { Label("General", systemImage: "gearshape") }
         }
-        .frame(width: 460)
-        .padding(20)
+        // Explicit height: hosted in a plain NSWindow (not the Settings scene), a
+        // Form/TabView reports no intrinsic height and the content collapses.
+        .frame(width: 460, height: 360)
     }
 }
 

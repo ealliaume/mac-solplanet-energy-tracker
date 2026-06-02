@@ -1,6 +1,6 @@
 # Bootstrap plan — Solplanet Energy Tracker (macOS menu bar app)
 
-> **Status:** draft plan, not yet implemented.
+> **Status:** in progress — M0–M3 + M5 + M6 + M9 shipped; M4 (color logic only), M7, M8 outstanding. See §15 for the per-milestone table. Last updated 2026-06-02.
 > **Author:** initial capture 2026-06-02.
 > **Reference codebase:** `/Users/ealliaume/private/git/mac-ai-trackers` ("AI Usages Tracker").
 > **API reference:** [`docs/solplanet-api-documentation.md`](../solplanet-api-documentation.md) (the live inverter local API, reverse-engineered).
@@ -317,18 +317,20 @@ Add a repo `CLAUDE.md` pointing at these (lazy-loaded), plus a "must not poll fa
 
 ## 15. Phased roadmap
 
-| Milestone | Deliverable | Done when |
-|---|---|---|
-| **M0 — Skeleton** | SwiftPM package (lib+app+iconkit+tests), `.accessory` app, empty `NSStatusItem` showing "Configure inverter", SwiftLint + CI green. | App launches in menu bar, no Dock icon. |
-| **M1 — Connectivity** | `HTTPClient` (self-signed TLS, injectable), `SolplanetConnector` querying device 4/2/3, `ConnectionSettings`, Connection settings tab with Detect/Test. | "Test connection" returns a live reading for a configured IP/SN. |
-| **M2 — Derivations + model** | `InverterReading`, value objects, `PowerDerivations` (PV=-pac etc.), fixtures + derivation tests (incl. high-PV regression). | All derivation tests pass against captured fixtures. |
-| **M3 — Persistence + poller** | `InverterPoller` (≥5 s floor, backoff), `ReadingsFileManager` (atomic+flock), `SnapshotRecorder`, file watcher, `ReadingsStore`. | `readings.json` + history JSONL update on a live system; store observes changes. |
-| **M4 — Menu bar** | `MenuBarLabelRenderer`, `MenuBarSegmentResolver`, segment seeding, `PowerTier` colors. | Configurable colored segments render live (PV/SOC/Battery/Load/Grid). |
-| **M5 — Popover** | Energy-flow card, metric rows, gauges, health banner. | Popover shows live data + health states. |
-| **M6 — Charts** | History reader, chart configs, All-power + SOC + Energy panels. | Charts render across all time windows with gap-aware lines. |
-| **M7 — Settings + lifecycle** | General/Charts/Health tabs, launch-at-login, logging+rotation+retention, PID guard. | Feature-complete v1; preferences take effect live. |
-| **M8 — Added features** | Energy-today/self-sufficiency, notifications, tariff savings (§11.1–3). | Opt-in features shipping behind settings. |
-| **M9 — Build/dist** | App bundle script, icon, README, screenshots; decide distribution. | `dist/Solplanet Energy Tracker.app` launches; docs updated. |
+Legend: ✅ shipped · 🟡 partial · ⬜ not started.
+
+| Milestone | Status | Deliverable | Done when |
+|---|---|---|---|
+| **M0 — Skeleton** | ✅ | SwiftPM package (lib+app+iconkit+tests), `.accessory` app, empty `NSStatusItem` showing "Configure inverter", SwiftLint + CI green. | App launches in menu bar, no Dock icon. |
+| **M1 — Connectivity** | ✅ | `HTTPClient` (self-signed TLS, injectable), `SolplanetConnector` querying device 4/2/3, `ConnectionSettings`, Connection settings tab with Test. *(Detect/`getdev.cgi` auto-identify still TODO.)* | "Test connection" returns a live reading for a configured IP/SN. |
+| **M2 — Derivations + model** | ✅ | `InverterReading`, value objects, `PowerDerivations` (PV=-pac etc.), fixtures + derivation tests (incl. high-PV regression). | All derivation tests pass against captured fixtures. |
+| **M3 — Persistence + poller** | ✅ | `InverterPoller` (≥5 s floor, backoff), `ReadingsFileManager` (atomic+flock), `SnapshotRecorder`, `ReadingsStore`. *(Poller pushes to the store directly; the JSON file watcher for external readers is deferred.)* | `readings.json` + history JSONL update on a live system; store observes changes. |
+| **M4 — Menu bar** | 🟡 | `PowerTier` color logic shipped. Menu bar currently renders plain text `☀ PV  🔋 SOC`; rasterized per-segment colored `NSImage` (`MenuBarLabelRenderer`, `MenuBarSegmentResolver`, seeding) still TODO. | Configurable colored segments render live (PV/SOC/Battery/Load/Grid). |
+| **M5 — Popover** | ✅ | Metric rows, health banner, footer. *(Energy-flow hero card + gauges still TODO.)* | Popover shows live data + health states. |
+| **M6 — Charts** | ✅ | `HistoryReader`, `ChartSeriesResolver` (gap-aware), `EnergyHistoryChartView` (Swift Charts), metric + window pickers. | Charts render across all time windows with gap-aware lines. |
+| **M7 — Settings + lifecycle** | 🟡 | Connection + General settings tabs shipped, preferences take effect live. Launch-at-login, logging+rotation+retention, PID guard, self-update still TODO. | Feature-complete v1; preferences take effect live. |
+| **M8 — Added features** | ⬜ | Energy-today/self-sufficiency (in scope); notifications + tariff deferred per §17. | Opt-in features shipping behind settings. |
+| **M9 — Build/dist** | 🟡 | `scripts/build-app-bundle.sh` → ad-hoc-signed `dist/Solplanet Battery Energy Tracker.app` with `.icns`, LSUIElement, NSLocalNetworkUsageDescription. README/screenshots + distribution decision still TODO. | `dist/Solplanet Battery Energy Tracker.app` launches; docs updated. |
 
 ---
 
@@ -366,7 +368,16 @@ Add a repo `CLAUDE.md` pointing at these (lazy-loaded), plus a "must not poll fa
 
 ## 18. Immediate next steps
 
-1. Confirm the Open-decisions in §17 (at least name + bundle id + v1 feature set).
-2. Copy the six Swift quality docs + `SWIFT-MENUBAR.md` into `docs/`, add `CLAUDE.md` with the lazy-load index and the 5 s-floor rule.
-3. Scaffold M0 (package + `.accessory` app + "Configure inverter" status item + CI).
-4. Drop the captured device JSON into test fixtures and write the M2 derivation tests first (TDD the formulas that took real effort to get right).
+1. ~~Confirm the Open-decisions in §17~~ — done (name, bundle id, single-inverter, no notifications, keep the script).
+2. ~~Copy the six Swift quality docs + `SWIFT-MENUBAR.md` into `docs/`, add `CLAUDE.md`~~ — done (incl. self-signed-TLS note + 5 s-floor rule).
+3. ~~Scaffold M0~~ — done.
+4. ~~Drop the captured device JSON into fixtures and TDD the M2 derivations~~ — done (incl. high-PV regression).
+
+**Next up (remaining work):**
+5. M4 — rasterized colored `NSStatusItem` segments per `SWIFT-MENUBAR.md` (replace the plain-text label; add `MenuBarSegmentResolver` + seeding + per-segment options).
+6. M7 — launch-at-login, logging (`Logger`/`LoggingProxy`/rotation+retention), PID guard, optional self-update.
+7. M8 — energy-today / self-sufficiency panel from `etd` + battery counters.
+8. M1 polish — Detect button (`getdev.cgi` auto-identify of SN/model/firmware).
+9. M3 polish — `ReadingsFileWatcher` so an external script/widget reads the same `readings.json` under `flock`.
+10. M5 polish — energy-flow hero card + SOC ring gauge.
+11. M9 — README + screenshots; decide distribution (Homebrew deferred per §17).

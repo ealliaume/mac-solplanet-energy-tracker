@@ -32,7 +32,7 @@ public enum PollingLimits {
     public static let minimumRefreshInterval: TimeInterval = 5
 
     /// Default gap used on first launch.
-    public static let defaultRefreshInterval: TimeInterval = 15
+    public static let defaultRefreshInterval: TimeInterval = 60
 
     /// Clamps a requested interval up to the safe floor. Callers must route every
     /// user-supplied interval through here before scheduling a poll.

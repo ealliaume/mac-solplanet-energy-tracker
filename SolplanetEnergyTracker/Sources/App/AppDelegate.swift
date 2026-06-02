@@ -10,6 +10,7 @@ import AppIconKit
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
     private var popover: NSPopover?
+    private var settingsWindow: NSWindow?
 
     private let preferences = UserDefaultsAppPreferences.shared
     private let cacheDirectory = CacheDirectory.makeDefault()
@@ -72,14 +73,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func openSettings() {
-        NSApp.activate(ignoringOtherApps: true)
-        let modern = Selector(("showSettingsWindow:"))
-        let legacy = Selector(("showPreferencesWindow:"))
-        if NSApp.responds(to: modern) {
-            NSApp.perform(modern, with: nil)
-        } else if NSApp.responds(to: legacy) {
-            NSApp.perform(legacy, with: nil)
+        // Close the transient popover first so the Settings window takes focus.
+        popover?.performClose(nil)
+
+        // An app-owned window, rather than the SwiftUI `Settings` scene: the scene's
+        // open action (`showSettingsWindow:`) is unreliable to invoke from an
+        // `.accessory` app with no app menu, so we present the same view ourselves.
+        if settingsWindow == nil {
+            // NSHostingController drives the window to its view's fitting size,
+            // which collapses a Form/TabView to ~zero height. Use an explicit
+            // content rect + NSHostingView so the window keeps a usable size.
+            let contentRect = NSRect(x: 0, y: 0, width: 460, height: 360)
+            let window = NSWindow(
+                contentRect: contentRect,
+                styleMask: [.titled, .closable],
+                backing: .buffered,
+                defer: false
+            )
+            window.title = AppInfo.displayName
+            window.isReleasedWhenClosed = false
+            window.contentView = NSHostingView(rootView: SettingsView(preferences: UserDefaultsAppPreferences.shared))
+            window.center()
+            settingsWindow = window
         }
+        NSApp.activate(ignoringOtherApps: true)
+        settingsWindow?.makeKeyAndOrderFront(nil)
     }
 
     // MARK: polling pipeline

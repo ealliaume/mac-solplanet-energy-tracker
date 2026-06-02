@@ -36,7 +36,7 @@ no account, read-only by design.
 
 ```sh
 brew tap ealliaume/tap
-brew install --cask --no-quarantine solplanet-energy-tracker
+brew install --cask solplanet-energy-tracker
 open "/Applications/Solplanet Battery Energy Tracker.app"
 ```
 
@@ -46,11 +46,6 @@ flow (it runs `brew upgrade --cask` for you when installed via the tap, or
 downloads and swaps the bundle otherwise). You can also `brew upgrade --cask
 solplanet-energy-tracker` by hand.
 
-> **Why `--no-quarantine`?** The build is **ad-hoc signed, not Apple-notarized**
-> (it's a self-distributed open-source tool). `--no-quarantine` lets first launch
-> work without the right-click → Open dance. As a belt-and-braces measure the app
-> also strips its own quarantine attribute at launch, so it works even if you
-> omit the flag. You opt into this trust by tapping a third-party repo.
 
 ### Build from source
 

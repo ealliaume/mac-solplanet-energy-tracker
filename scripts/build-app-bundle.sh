@@ -13,7 +13,7 @@ DIST_DIR="$REPO_ROOT/dist"
 APP_DISPLAY_NAME="Solplanet Battery Energy Tracker"
 APP_BINARY_NAME="SolplanetBatteryEnergyTracker"
 BUNDLE_ID="io.github.ealliaume.solplanet-energy-tracker"
-BUNDLE_VERSION="${BUNDLE_VERSION:-0.1.0}"
+BUNDLE_VERSION="${BUNDLE_VERSION:-1.0.0}"
 MIN_MACOS_VERSION="14.0"
 
 APP_BUNDLE="$DIST_DIR/$APP_DISPLAY_NAME.app"

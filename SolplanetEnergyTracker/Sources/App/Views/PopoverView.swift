@@ -6,6 +6,7 @@ import SolplanetEnergyTrackerLib
 struct PopoverView: View {
     let store: ReadingsStore
     let historyReader: HistoryReader
+    var onRefresh: () -> Void
     var onOpenSettings: () -> Void
     var onQuit: () -> Void
 
@@ -114,6 +115,11 @@ struct PopoverView: View {
 
     private var footer: some View {
         HStack {
+            Button(action: onRefresh) {
+                Image(systemName: "arrow.clockwise")
+            }
+            .buttonStyle(.borderless)
+            .help("Refresh now")
             if let reading = store.primary, let date = reading.takenAt.date {
                 Text("Updated \(date.formatted(.relative(presentation: .numeric)))")
                     .font(.caption).foregroundStyle(.secondary)

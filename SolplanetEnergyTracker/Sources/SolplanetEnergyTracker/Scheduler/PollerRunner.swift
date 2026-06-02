@@ -37,6 +37,16 @@ public actor PollerRunner {
         loop = nil
     }
 
+    /// Runs a single tick immediately, outside the scheduled cadence (the menu-bar
+    /// "Refresh now" action). The poller is an actor, so this serializes with the
+    /// loop's tick — no parallel requests to the fragile dongle.
+    public func refreshNow() async {
+        guard let settings = settingsProvider() else { return }
+        if let outcome = await tickIgnoringCancellation(settings) {
+            onOutcome(outcome)
+        }
+    }
+
     private func run() async {
         while !Task.isCancelled {
             let delay: TimeInterval

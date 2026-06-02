@@ -58,6 +58,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             rootView: PopoverView(
                 store: store,
                 historyReader: HistoryReader(directory: cacheDirectory),
+                onRefresh: { [weak self] in
+                    guard let runner = self?.runner else { return }
+                    Task { await runner.refreshNow() }
+                },
                 onOpenSettings: { [weak self] in self?.openSettings() },
                 onQuit: { NSApp.terminate(nil) }
             )

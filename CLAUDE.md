@@ -24,12 +24,12 @@ plan (`docs/plans/plan_mac_bootstrap.md`), the inverter API snapshot
 When writing or modifying Swift code, you **must** load and follow all six Swift
 guideline docs before writing any code:
 
-- `docs/SWIFT-CONCURRENCY.md` — cooperative thread pool, NSFormatter thread safety, actors, Process/URLSession timeouts
-- `docs/SWIFT-ERROR-HANDLING.md` — no silent `try?`, no success-after-catch, rich error types
-- `docs/SWIFT-IO-ROBUSTNESS.md` — atomic writes, flock with timeout, O(n+m) merges, **self-signed-TLS host pinning**
-- `docs/SWIFT-TESTABILITY.md` — dependency injection, test coverage, force-unwrap, comments, magic numbers
-- `docs/SWIFT-VALUE-OBJECTS.md` — value objects for domain fields (Watts, Percent, Volts, Host, SerialNumber, …)
-- `docs/SWIFT-MENUBAR.md` — menu bar UI: `NSStatusItem` (not `MenuBarExtra`), non-template `NSImage`, appearance detection
+- `docs/guidelines/swift-concurrency.md` — cooperative thread pool, NSFormatter thread safety, actors, Process/URLSession timeouts
+- `docs/guidelines/switch-error-handling.md` — no silent `try?`, no success-after-catch, rich error types
+- `docs/guidelines/swift-io.md` — atomic writes, flock with timeout, O(n+m) merges, **self-signed-TLS host pinning**
+- `docs/guidelines/swift-testability.md` — dependency injection, test coverage, force-unwrap, comments, magic numbers
+- `docs/guidelines/swift-value-objects.md` — value objects for domain fields (Watts, Percent, Volts, Host, SerialNumber, …)
+- `docs/guidelines/swift-menubar.md` — menu bar UI: `NSStatusItem` (not `MenuBarExtra`), non-template `NSImage`, appearance detection
 
 ## Must not poll the dongle faster than 5 s
 

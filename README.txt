@@ -1,6 +1,11 @@
 
-Full API reference: ./docs/solplanet-api-documentation.md
-Live status script:  ./scripts/battery_status.sh  (add --watch for live refresh)
+Solplanet Battery Energy Tracker — menubar-only macOS app for live inverter telemetry.
+
+App (Swift package):  cd SolplanetEnergyTracker && swift build && swift test
+Bootstrap plan:       ./docs/plans/plan_mac_bootstrap.md
+Engineering rules:    ./CLAUDE.md  + ./docs/SWIFT-*.md
+Full API reference:   ./docs/solplanet-api-documentation.md
+Live status script:   ./scripts/battery_status.sh  (add --watch for live refresh)
 
 How to query battery usage:
 

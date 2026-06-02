@@ -14,6 +14,10 @@ public struct SemanticVersion: Sendable, Equatable, Comparable, CustomStringConv
         self.patch = patch
     }
 
+    /// Spelled-out alias of `init(_:)` for call sites that read better as
+    /// `SemanticVersion(string: tag)` (mirrors the reference `AppVersion(string:)`).
+    public init?(string raw: String) { self.init(raw) }
+
     public init?(_ raw: String) {
         var text = raw.trimmingCharacters(in: .whitespaces)
         if text.hasPrefix("v") || text.hasPrefix("V") { text.removeFirst() }
@@ -31,4 +35,8 @@ public struct SemanticVersion: Sendable, Equatable, Comparable, CustomStringConv
     }
 
     public var description: String { "\(major).\(minor).\(patch)" }
+
+    /// Canonical `major.minor.patch` string. Used as the persistence key for the
+    /// "skip this version" list and in UI labels, so it must stay stable.
+    public var rawValue: String { description }
 }

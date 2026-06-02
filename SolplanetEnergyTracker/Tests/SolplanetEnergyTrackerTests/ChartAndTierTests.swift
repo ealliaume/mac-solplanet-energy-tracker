@@ -13,18 +13,20 @@ final class ChartSeriesResolverTests: XCTestCase {
 
     func testFiltersToWindow() {
         let snapshots = [
-            snapshot(at: "2026-05-30T03:00:00Z"),   // 9h ago — outside 6h
+            snapshot(at: "2026-05-29T06:00:00Z"),   // 30h ago — outside 24h
             snapshot(at: "2026-05-30T11:00:00Z"),   // 1h ago — inside
             snapshot(at: "2026-05-30T11:30:00Z"),   // inside
         ]
-        let points = ChartSeriesResolver.series(from: snapshots, metric: .pv, window: .sixHours, now: now)
+        let points = ChartSeriesResolver.series(from: snapshots, metric: .pv, window: .day, now: now)
         XCTAssertEqual(points.compactMap(\.value).count, 2)
     }
 
-    func testAllWindowKeepsEverything() {
-        let snapshots = [snapshot(at: "2020-01-01T00:00:00Z"), snapshot(at: "2026-05-30T11:00:00Z")]
-        let points = ChartSeriesResolver.series(from: snapshots, metric: .pv, window: .all, now: now)
-        // Both samples kept; a gap break is inserted between them (years apart).
+    func testWeekWindowKeepsOlderSamples() {
+        let snapshots = [
+            snapshot(at: "2026-05-25T12:00:00Z"),   // 5d ago — inside 7d, outside 24h
+            snapshot(at: "2026-05-30T11:00:00Z"),   // 1h ago — inside
+        ]
+        let points = ChartSeriesResolver.series(from: snapshots, metric: .pv, window: .week, now: now)
         XCTAssertEqual(points.compactMap(\.value).count, 2)
     }
 

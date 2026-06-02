@@ -6,6 +6,7 @@ import SolplanetEnergyTrackerLib
 /// floor (plan §10).
 struct SettingsView: View {
     let preferences: any AppPreferences
+    let updateState: UpdateState
 
     var body: some View {
         TabView {
@@ -13,6 +14,8 @@ struct SettingsView: View {
                 .tabItem { Label("Connection", systemImage: "network") }
             GeneralSettingsView(preferences: preferences)
                 .tabItem { Label("General", systemImage: "gearshape") }
+            UpdatesSettingsView(preferences: preferences, updateState: updateState)
+                .tabItem { Label("Updates", systemImage: "arrow.down.circle") }
         }
         // Explicit size: hosted in a plain NSWindow (not the Settings scene), a
         // Form/TabView reports no intrinsic height and the content collapses.

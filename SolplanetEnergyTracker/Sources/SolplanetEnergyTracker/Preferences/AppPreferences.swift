@@ -13,6 +13,9 @@ public protocol AppPreferences: AnyObject, Sendable {
     var menuBarDisplayOptions: MenuBarDisplayOptions { get set }
     /// Whether to check GitHub for a newer release in the background.
     var updatesAutoCheckEnabled: Bool { get set }
+    /// Versions the user explicitly chose to skip; the update banner stays
+    /// dismissed for these across launches.
+    var updatesDismissedVersions: [String] { get set }
 }
 
 public extension Notification.Name {
@@ -43,6 +46,7 @@ public final class UserDefaultsAppPreferences: AppPreferences, @unchecked Sendab
         static let refreshInterval = "solplanet-tracker.refreshIntervalSeconds"
         static let menuBarDisplayOptions = "solplanet-tracker.menuBarDisplayOptions"
         static let updatesAutoCheckEnabled = "solplanet-tracker.updatesAutoCheckEnabled"
+        static let updatesDismissedVersions = "solplanet-tracker.updatesDismissedVersions"
     }
 
     /// Process-wide instance shared by the poll pipeline (AppDelegate) and the
@@ -94,5 +98,10 @@ public final class UserDefaultsAppPreferences: AppPreferences, @unchecked Sendab
         // Defaults to on when never set.
         get { defaults.object(forKey: Key.updatesAutoCheckEnabled) as? Bool ?? true }
         set { defaults.set(newValue, forKey: Key.updatesAutoCheckEnabled) }
+    }
+
+    public var updatesDismissedVersions: [String] {
+        get { defaults.stringArray(forKey: Key.updatesDismissedVersions) ?? [] }
+        set { defaults.set(newValue, forKey: Key.updatesDismissedVersions) }
     }
 }

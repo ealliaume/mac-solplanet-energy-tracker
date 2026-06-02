@@ -2,21 +2,15 @@ import Foundation
 
 /// Time spans offered by the charts (plan §6/§8).
 public enum ChartWindow: String, Sendable, CaseIterable, Identifiable {
-    case sixHours
     case day
     case week
-    case month
-    case all
 
     public var id: String { rawValue }
 
     public var title: String {
         switch self {
-        case .sixHours: return "6h"
         case .day: return "24h"
         case .week: return "7d"
-        case .month: return "30d"
-        case .all: return "All"
         }
     }
 
@@ -24,11 +18,8 @@ public enum ChartWindow: String, Sendable, CaseIterable, Identifiable {
     public var seconds: TimeInterval? {
         let hour: TimeInterval = 3600
         switch self {
-        case .sixHours: return 6 * hour
         case .day: return 24 * hour
         case .week: return 7 * 24 * hour
-        case .month: return 30 * 24 * hour
-        case .all: return nil
         }
     }
 }

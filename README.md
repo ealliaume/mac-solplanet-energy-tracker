@@ -26,20 +26,42 @@ no account, read-only by design.
 - **Read-only & safe** — it never writes to the inverter, and **never polls faster than every 5 seconds** (the dongle can brick under tight polling).
 - **Manual refresh** — a one-click ↻ in the popover when you can't wait for the next tick.
 
+<img src="assets/mac-solplanet-energy-tracker.jpeg" alt="Multi-account popover" height="400">
+
 ---
 
 ## 📦 Installation
 
-Build the app from source (a couple of commands — see [Build from source](#-build-from-source)):
+### Homebrew (recommended)
+
+```sh
+brew tap ealliaume/tap
+brew install --cask --no-quarantine solplanet-energy-tracker
+open "/Applications/Solplanet Battery Energy Tracker.app"
+```
+
+From then on **the app updates itself**: it checks GitHub for new releases at
+launch and every six hours, and the popover offers an **Install** → **Restart**
+flow (it runs `brew upgrade --cask` for you when installed via the tap, or
+downloads and swaps the bundle otherwise). You can also `brew upgrade --cask
+solplanet-energy-tracker` by hand.
+
+> **Why `--no-quarantine`?** The build is **ad-hoc signed, not Apple-notarized**
+> (it's a self-distributed open-source tool). `--no-quarantine` lets first launch
+> work without the right-click → Open dance. As a belt-and-braces measure the app
+> also strips its own quarantine attribute at launch, so it works even if you
+> omit the flag. You opt into this trust by tapping a third-party repo.
+
+### Build from source
 
 ```sh
 ./scripts/build-app-bundle.sh
 open "dist/Solplanet Battery Energy Tracker.app"
 ```
 
-This produces an ad-hoc-signed, menubar-only `.app` you can drag into `/Applications`.
-
-> 💡 Homebrew distribution is planned for later.
+This produces an ad-hoc-signed, menubar-only `.app` you can drag into
+`/Applications`. Cutting a release is one command — see
+[docs/how-to/how-to-release.md](docs/how-to/how-to-release.md).
 
 ---
 

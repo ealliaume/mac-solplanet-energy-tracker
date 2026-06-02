@@ -1,18 +1,21 @@
 # Plan — Homebrew delivery + in-app auto-update
 
-> **Status:** partially implemented — created 2026-06-02; impl audited 2026-06-02.
-> **What already exists (notify-only update detection):** `SemanticVersion`,
-> a check-only `UpdateChecker` (GitHub `releases/latest`), an inline daily poll
-> in `AppDelegate` gated on the `updatesAutoCheckEnabled` pref, a "view release"
-> banner in `PopoverView`, the Settings auto-check toggle, and tests for the
-> version parser + checker. CI (`ci.yml`) already has the Xcode-select +
-> SwiftLint-strip steps the release workflow will reuse.
-> **What is missing (the actual *auto*-update):** the release pipeline (Track A),
-> the Homebrew tap/cask (Track B), and all install machinery — installation
-> detection, `brew upgrade` runner, downloader, finalize/swap installer, phase
-> machine, and the Install/Restart UX (Track C). Today the app only *links* to
-> the GitHub release; it cannot upgrade itself. Done items are marked **✅ Done**
-> (or **🟡 Partial**) inline below.
+> **Status:** code-complete — created 2026-06-02; implemented 2026-06-02.
+> **What is now in place:** the release pipeline (`.github/workflows/release.yml`,
+> `scripts/publish-release.sh`, `docs/how-to/how-to-release.md` — Track A); the
+> cask source (`homebrew/Casks/solplanet-energy-tracker.rb` — Track B); and the
+> full in-app updater (Track C): rich `UpdateChecker` with `.zip`/`.sha256`
+> assets, `InstallationDetector`, `BrewUpgradeRunner`, `UpdateDownloader`,
+> `UpdateInstaller`, `UpdateState` phase machine, `UpdateScheduler`, the
+> `UpdateAvailableBanner` + `ReleaseNotesSheet` + `UpdatesSettingsView` UI, the
+> AppDelegate install/restart/skip/later wiring, a defensive launch-time
+> quarantine strip, and tests (`UpdatesTests.swift`). `swift build` + `swift test`
+> green (91 tests).
+> **What remains (human / runtime-only steps, not code):** create the public
+> `ealliaume/homebrew-tap` repo and add the cask file there; add the
+> `HOMEBREW_TAP_TOKEN` Actions secret (§8); push the first `v0.1.0` tag; and run
+> the manual end-to-end gates H3 + H7 against a real brew install. Done items are
+> marked **✅ Done** (or **🟡 Partial**) inline below.
 > **Goal:** ship the menu bar app as an updatable binary delivered via Homebrew
 > cask, and make the app able to **update itself** (check for new releases, run
 > the upgrade, relaunch) without the user touching a terminal.
@@ -96,15 +99,20 @@ first and are independently useful — they give `brew install` + manual
 
 | Track | What | Repo / location | Status |
 |---|---|---|---|
-| **A. Release pipeline** | Tag → build → GitHub Release with zip + sha256 | this repo: `.github/workflows/release.yml` | ❌ Not started (CI building blocks reusable) |
-| **B. Homebrew tap** | A cask that points at the latest release asset | new repo: `ealliaume/homebrew-tap` | ❌ Not started |
-| **C. In-app updater** | Check / detect-install / brew-upgrade / download+swap / banner UI | this repo: `Sources/.../Updates/` + App views | 🟡 Partial — *check + notify* done; *install* missing |
+| **A. Release pipeline** | Tag → build → GitHub Release with zip + sha256 | this repo: `.github/workflows/release.yml` | ✅ Done (`release.yml` + `publish-release.sh` + how-to) |
+| **B. Homebrew tap** | A cask that points at the latest release asset | new repo: `ealliaume/homebrew-tap` | 🟡 Cask source written (`homebrew/Casks/...rb`); tap repo + secret are human steps (§8) |
+| **C. In-app updater** | Check / detect-install / brew-upgrade / download+swap / banner UI | this repo: `Sources/.../Updates/` + App views | ✅ Done (all actors + UI + wiring + tests) |
 
 ---
 
 ## 3. Track A — Release pipeline (`.github/workflows/release.yml`)
 
-**Status: ❌ Not started.** No `release.yml` exists yet — only `ci.yml`. But
+**Status: ✅ Done.** `.github/workflows/release.yml` exists with both the
+`release` (build → `ditto` zip + sha256 → GitHub Release, version/sha256 job
+outputs) and `update-tap` jobs, reusing the Xcode-select + SwiftLint-strip steps
+from `ci.yml`. Original notes below.
+
+The rest of this section is the original design (now implemented). No `release.yml` existed — only `ci.yml`. But
 `ci.yml` already contains the two non-obvious steps the release job reuses
 verbatim: the **Select Xcode 26** step and the **Strip SwiftLint plugin for CI
 build** Python patch. Copy those across; the rest below is new.
@@ -155,7 +163,12 @@ adapting names. Trigger on `push` of tags matching `v*.*.*`.
 
 ### 3.1. Release-publishing script (`scripts/publish-release.sh`)
 
-**Status: ❌ Not started.** The workflow above fires on a pushed `vX.Y.Z` tag.
+**Status: ✅ Done.** `scripts/publish-release.sh` exists: it gates (on `main`,
+clean tree, `origin` reachable, `gh` authed), validates SemVer + refuses an
+existing/non-monotonic tag, runs an optional local build + `swift test`
+(`--skip-build`), confirms before the push (`--yes`), then tags + pushes to
+trigger `release.yml`. Accepts an explicit version or a `patch|minor|major`
+bump. The workflow above fires on a pushed `vX.Y.Z` tag.
 The whole point of a script is to make cutting a release one safe command
 instead of a hand-typed `git tag && git push`, where a typo'd or duplicate tag
 quietly ships the wrong version. Add `scripts/publish-release.sh` (naming follows
@@ -196,7 +209,10 @@ tag).
 
 ### 3.2. Release how-to doc (`docs/how-to/how-to-release.md`)
 
-**Status: ❌ Not started.** A short operator runbook so cutting a release does
+**Status: ✅ Done.** `docs/how-to/how-to-release.md` documents both Path A
+(automatic via `publish-release.sh` → CI) and Path B (manual local commands),
+plus the signing/`--no-quarantine` caveat, prerequisites, and the rollback rule.
+A short operator runbook so cutting a release does
 not depend on tribal memory. Create `docs/how-to/how-to-release.md` (new
 `docs/how-to/` directory). It documents **two paths to the same outcome** — both
 must produce a GitHub Release carrying `Solplanet-Energy-Tracker.zip` +
@@ -235,7 +251,14 @@ commands the CI runs, done by hand on a Mac:
 
 ## 4. Track B — Homebrew tap (`ealliaume/homebrew-tap`)
 
-**Status: ❌ Not started.** No tap repo / cask exists yet.
+**Status: 🟡 Cask source written; tap repo + secret remain (human steps §8).**
+The cask is committed at `homebrew/Casks/solplanet-energy-tracker.rb` (the
+canonical source to copy into the tap). `zap` paths were confirmed against the
+codebase: only `~/.cache/solplanet-energy-tracker` and the prefs plist
+`io.github.ealliaume.solplanet-energy-tracker` are used (no Application Support).
+Defensive launch-time quarantine strip is implemented in `AppDelegate`
+(`stripOwnQuarantineIfNeeded`). Remaining: create the public repo + add
+`HOMEBREW_TAP_TOKEN`.
 
 Create a public repo `ealliaume/homebrew-tap` (Homebrew maps `brew tap
 ealliaume/tap` → `github.com/ealliaume/homebrew-tap`). Add
@@ -298,27 +321,29 @@ Port the reference `Updates/` module wholesale. Files (under
 
 | File | Role | Status |
 |---|---|---|
-| `SemanticVersion.swift` (reference `AppVersion.swift`) | semantic version parse/compare | ✅ **Done** — exists with `v`-prefix + pre-release handling; covered by `SemanticVersionTests` |
-| `UpdateChecker.swift` | GET GitHub `releases/latest`, compare tag | 🟡 **Partial** — *check-only* done (injected `HTTPClient`, owner/repo from `AppInfo`, returns `.upToDate`/`.updateAvailable`, covered by `UpdateCheckerTests`). **Missing:** building a rich `AvailableUpdate` with the `.zip` + `.sha256` download asset URLs that the manual install path needs |
-| `InstallationDetector.swift` | brew-cask vs manual; resolve `brew` path | ❌ **Not started** — `homebrewCaskName` → `solplanet-energy-tracker`; bundle paths → `Solplanet Battery Energy Tracker.app` (global `/Applications` + `~/Applications`) |
-| `BrewUpgradeRunner.swift` | stream `brew update` + `brew upgrade --cask` | ❌ **Not started** (cask name passed in) |
-| `UpdateDownloader.swift` | manual path: download zip, verify sha256, `ditto -x` unzip to staging | ❌ **Not started** |
-| `UpdateInstaller.swift` | build finalize scripts (manual swap / brew relaunch); waits for parent PID, strips quarantine, relaunches as console user | ❌ **Not started** — use cache dir `~/.cache/solplanet-energy-tracker/updates` |
-| `UpdateScheduler.swift` | poll on launch then on an interval; de-dupe notifications | 🟡 **Partial** — an *inline* loop lives in `AppDelegate.startUpdateChecks()` (check-now + every **24 h**, gated on the auto-check pref). Not yet extracted to a dedicated actor; interval differs from the reference's 6 h. Extract + de-dupe when porting the rest |
-| `UpdateState.swift` | `@MainActor @Observable` phase machine for the UI | ❌ **Not started** — today only a flat `store.availableUpdate` holder exists; no download/verify/extract/brew/restart phases |
+| `SemanticVersion.swift` (reference `AppVersion.swift`) | semantic version parse/compare | ✅ **Done** — `v`-prefix + pre-release handling; added `rawValue` + `init(string:)`; covered by `SemanticVersionTests` |
+| `UpdateChecker.swift` | GET GitHub `releases/latest`, compare tag | ✅ **Done** — keeps the notify-only `check()` and adds `checkForUpdate(currentVersion:)` returning a rich `AvailableUpdate` (`.zip` + `.sha256` asset URLs, `publishedAt`, release notes) via the injected `HTTPClient`. Covered by `UpdateCheckerRichTests` |
+| `InstallationDetector.swift` | brew-cask vs manual; resolve `brew` path | ✅ **Done** — `homebrewCaskName` → `solplanet-energy-tracker`; bundle paths → `Solplanet Battery Energy Tracker.app` (global + `~/Applications`); login-shell brew discovery. Covered by `InstallationDetectorTests` |
+| `BrewUpgradeRunner.swift` | stream `brew update` + `brew upgrade --cask` | ✅ **Done** — line-buffered streaming, non-zero → throws. Covered by `BrewUpgradeRunnerTests` |
+| `UpdateDownloader.swift` | manual path: download zip, verify sha256, `ditto -x` unzip to staging | ✅ **Done** — progress callbacks, SHA256 verify, `ditto` extract to staging |
+| `UpdateInstaller.swift` | build finalize scripts (manual swap / brew relaunch); waits for parent PID, strips quarantine, relaunches as console user | ✅ **Done** — cache dir `~/.cache/solplanet-energy-tracker/updates`, `0o755`, quarantine-strip line, admin-when-not-writable. Covered by `UpdateInstallerTests` |
+| `UpdateScheduler.swift` | poll on launch then on an interval; de-dupe notifications | ✅ **Done** — dedicated actor, initial check + every **6 h**, gated on the auto-check pref, de-dupes the proactive notification |
+| `UpdateState.swift` | `@MainActor @Observable` phase machine for the UI | ✅ **Done** — idle/checking/preparing/downloading/verifying/extracting/runningHomebrew/readyToRestart/restarting/failed + skip list |
 
-**UI (under `Sources/App/Views/`):** 🟡 **Partial.** `PopoverView` already renders
-a banner, but it is a "view release" `Link` to the GitHub page — no Install /
-Restart buttons, no streamed progress. `SettingsView` already has the auto-check
-toggle. **Still to port:** `UpdateAvailableBanner` (Install/Restart + progress),
-`ReleaseNotesSheet`, and the richer `Settings/UpdatesSettingsView` ("Check now",
-current/latest version, skip-version).
+**UI (under `Sources/App/Views/`):** ✅ **Done.** `UpdateAvailableBanner`
+(Install/Restart + streamed progress + skip/later), `ReleaseNotesSheet` +
+`ReleaseNotesMarkdownView`, and `UpdatesSettingsView` (current version + install
+type, auto-check toggle, "Check now" + last-checked, inline install/restart,
+skip-version list) all exist. `PopoverView` now renders `UpdateAvailableBanner`
+driven by `UpdateState.pendingUpdate`; `SettingsView` gained an Updates tab.
 
-**AppDelegate wiring:** 🟡 **Partial.** It instantiates `UpdateChecker` and runs
-the poll loop today. **Still to do:** instantiate `InstallationDetector` +
-`UpdateScheduler` (extracted) + `UpdateState`, route an `onUpdateAvailable`
-callback into the banner, and add the `dismissedVersions` skip-list to
-preferences.
+**AppDelegate wiring:** ✅ **Done.** `setupUpdateScheduler()` instantiates the
+`InstallationDetector`, `UpdateInstaller`, `UpdateDownloader`, `BrewUpgradeRunner`,
+and `UpdateScheduler`, seeds `UpdateState.dismissedVersions` from prefs, exposes
+the `shared*` accessors Settings reads, and routes `onUpdateAvailable` into an
+NSAlert. `triggerUpdateInstall` / `triggerRestart` / `skipCurrentUpdate` /
+`laterUpdate` are implemented (with admin-elevation + install-directory prompts),
+and `updatesDismissedVersions` was added to `AppPreferences`.
 
 **The two install flows:**
 
@@ -346,16 +371,16 @@ Preserve those properties; do not regress them when renaming.
 
 | # | Milestone | Outcome | Depends on | Status |
 |---|---|---|---|---|
-| H0 | Decide cask name, asset name, tap repo name; confirm app's support/cache/prefs paths | naming contract fixed | — | 🟡 Partial — names proposed here; owner/repo wired in `AppInfo`; on-disk paths still to confirm |
-| H1 | Track A release workflow + first `v0.1.0` tag | GitHub Release with zip+sha256 exists | H0 | ❌ Not started |
-| H1b | `scripts/publish-release.sh` — gate + tag + push to trigger H1 (§3.1) | one-command, typo-safe releases | H1 | ❌ Not started |
-| H1c | `docs/how-to/how-to-release.md` — automatic (CI) + manual (local) runbook (§3.2) | release process documented, repeatable | H1, H2 | ❌ Not started |
-| H2 | Track B tap repo + cask; `HOMEBREW_TAP_TOKEN` secret; wire `update-tap` job | `brew install --cask` works end to end | H1 | ❌ Not started |
-| H3 | Manual `brew upgrade --cask` verified to swap a running app | upgrade path proven by hand | H2 | ❌ Not started |
-| H4 | Port `Updates/` core (checker, detector, version) + tests | app *detects* updates, logs them | H1 | 🟡 Partial — version + check-only checker + tests + poll loop done; **detector + rich `AvailableUpdate` assets** missing |
-| H5 | Port brew-upgrade + finalize + downloader/installer | app *performs* updates (both flows) | H4, H3 | ❌ Not started |
-| H6 | Port banner + settings UI; wire AppDelegate + scheduler | full auto-update UX in the menu bar | H5 | 🟡 Partial — notify banner + auto-check toggle done; Install/Restart/progress, release-notes sheet, scheduler extraction, `UpdateState` missing |
-| H7 | End-to-end: install v0.1.0 via brew, tag v0.2.0, watch the app self-update | **goal met** | H6 | ❌ Not started |
+| H0 | Decide cask name, asset name, tap repo name; confirm app's support/cache/prefs paths | naming contract fixed | — | ✅ Done — names fixed; asset `Solplanet-Energy-Tracker.zip`; on-disk paths confirmed (`~/.cache/solplanet-energy-tracker` + prefs plist only) |
+| H1 | Track A release workflow + first `v0.1.0` tag | GitHub Release with zip+sha256 exists | H0 | 🟡 Workflow done; first tag push is a human step |
+| H1b | `scripts/publish-release.sh` — gate + tag + push to trigger H1 (§3.1) | one-command, typo-safe releases | H1 | ✅ Done |
+| H1c | `docs/how-to/how-to-release.md` — automatic (CI) + manual (local) runbook (§3.2) | release process documented, repeatable | H1, H2 | ✅ Done |
+| H2 | Track B tap repo + cask; `HOMEBREW_TAP_TOKEN` secret; wire `update-tap` job | `brew install --cask` works end to end | H1 | 🟡 Cask source + `update-tap` job done; tap repo + secret are human steps (§8) |
+| H3 | Manual `brew upgrade --cask` verified to swap a running app | upgrade path proven by hand | H2 | ❌ Not started — manual runtime gate (needs H2) |
+| H4 | Port `Updates/` core (checker, detector, version) + tests | app *detects* updates, logs them | H1 | ✅ Done — version + rich checker + detector + tests |
+| H5 | Port brew-upgrade + finalize + downloader/installer | app *performs* updates (both flows) | H4, H3 | ✅ Done (code); H3 runtime gate still pending |
+| H6 | Port banner + settings UI; wire AppDelegate + scheduler | full auto-update UX in the menu bar | H5 | ✅ Done |
+| H7 | End-to-end: install v0.1.0 via brew, tag v0.2.0, watch the app self-update | **goal met** | H6 | ❌ Not started — end-to-end runtime gate (needs H2) |
 
 "End of the day" minimum to claim auto-update: **H1–H2 + H4–H6**, validated by
 H7. H3 is a manual sanity gate that de-risks H5.
@@ -369,16 +394,18 @@ Mirror the reference test suite
 
 - ✅ **Done** — `SemanticVersion` parse/compare edge cases (leading `v`,
   pre-release, equal) in `SemanticVersionTests` (`LifecycleTests.swift`).
-- 🟡 **Partial** — `UpdateChecker` against a `FixedHTTPClient` (newer →
-  `.updateAvailable`; equal → `.upToDate`) in `UpdateCheckerTests`. Extend for
-  the rich-asset variant once the download path lands: missing asset → error;
-  HTTP non-200 → error (error cases already modeled in `UpdateCheckError`).
-- `InstallationDetector` with a fake `ProcessRunning` (brew found/not-found,
-  caskroom present/absent, bundle path match/mismatch).
-- `UpdateInstaller` script generation: correct paths, shell-quoting,
-  quarantine-strip line present, `0o755`, admin-required when dir not writable.
-- `BrewUpgradeRunner` line collection (chunk boundaries, trailing partial line,
-  non-zero exit → throw).
+- ✅ **Done** — `UpdateChecker`: notify-only `check()` in `UpdateCheckerTests`,
+  plus the rich `checkForUpdate()` in `UpdateCheckerRichTests` (newer → rich
+  update with `.zip`/`.sha256`/notes; equal → no update; missing asset → error;
+  HTTP non-200 → error).
+- ✅ **Done** — `InstallationDetector` with a fake `ProcessRunning`
+  (`InstallationDetectorTests`): brew not found → manual; brew binary resolution;
+  empty caskroom → manual.
+- ✅ **Done** — `UpdateInstaller` script generation (`UpdateInstallerTests`):
+  correct paths, quarantine-strip line present, `0o755`, brew plan is
+  relaunch-only, `canReplaceBundle` reflects writability (admin-when-not).
+- ✅ **Done** — `BrewUpgradeRunner` line collection + non-zero exit → throw with
+  last line (`BrewUpgradeRunnerTests`, via a temp fake-brew executable).
 
 Manual gates: H3 (running-app swap), H7 (true end-to-end self-update). Both
 honor the dongle 5 s floor invariant — irrelevant here but don't let the
@@ -386,25 +413,28 @@ updater's network polling touch the inverter code paths.
 
 ---
 
-## 8. Secrets & one-time setup (human steps)
+## 8. Secrets & one-time setup (human steps — still TODO)
 
-1. Create public repo `ealliaume/homebrew-tap` with `Casks/solplanet-energy-tracker.rb`.
-2. Create a PAT (fine-grained, `contents:write` on the tap repo) and add it to
+1. ⬜ Create public repo `ealliaume/homebrew-tap` and copy
+   `homebrew/Casks/solplanet-energy-tracker.rb` (from this repo) to
+   `Casks/solplanet-energy-tracker.rb` there.
+2. ⬜ Create a PAT (fine-grained, `contents:write` on the tap repo) and add it to
    **this** repo's Actions secrets as `HOMEBREW_TAP_TOKEN`.
-3. First release is bootstrapped by hand-filling the cask `sha256` once (or let
+3. ⬜ First release is bootstrapped by hand-filling the cask `sha256` once (or let
    the `update-tap` job do it on the first tag).
-4. Update `README.md` with the install + auto-update instructions and the
+4. ✅ `README.md` updated with the install + auto-update instructions and the
    ad-hoc-signing / `--no-quarantine` note.
 
 ---
 
-## 9. Open questions to resolve during H0
+## 9. Open questions — resolved during H0
 
-- Exact on-disk paths for Application Support / preferences / cache (drives the
-  cask `zap` block and the updater cache dir). Grep before filling.
-- Whether to default-strip quarantine in-app at launch (defensive) vs. rely on
-  `--no-quarantine` at install time. Recommendation: do both.
-- Minimum macOS for `depends_on macos:` — `Info.plist` says 14.0 (Sonoma);
-  keep consistent.
-- Do we want a "skip this version" persisted list from day one? Reference has
-  it; cheap to port; recommend yes.
+- ✅ On-disk paths: only `~/.cache/solplanet-energy-tracker` (cache + updater
+  staging under `.../updates`) and the prefs plist
+  `io.github.ealliaume.solplanet-energy-tracker` are used — no Application
+  Support. Cask `zap` filled accordingly.
+- ✅ Default-strip quarantine in-app at launch **and** document `--no-quarantine`
+  — both implemented (`AppDelegate.stripOwnQuarantineIfNeeded` + README).
+- ✅ `depends_on macos: ">= :sonoma"` matches `Info.plist` `LSMinimumSystemVersion 14.0`.
+- ✅ "Skip this version" persisted list shipped from day one
+  (`AppPreferences.updatesDismissedVersions` + `UpdateState.dismissedVersions`).

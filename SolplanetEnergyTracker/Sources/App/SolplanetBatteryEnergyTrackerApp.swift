@@ -12,7 +12,10 @@ struct SolplanetBatteryEnergyTrackerApp: App {
 
     var body: some Scene {
         Settings {
-            SettingsView(preferences: UserDefaultsAppPreferences.shared)
+            SettingsView(
+                preferences: UserDefaultsAppPreferences.shared,
+                updateState: AppDelegate.sharedUpdateState
+            )
         }
     }
 }

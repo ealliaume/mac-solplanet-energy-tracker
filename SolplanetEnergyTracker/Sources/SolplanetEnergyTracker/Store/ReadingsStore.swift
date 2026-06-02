@@ -11,8 +11,6 @@ public final class ReadingsStore {
     /// Wall-clock time a fresh reading was last received (not the dongle's `tim`).
     /// Drives the "Updated X ago" footer so it resets the moment data arrives.
     public private(set) var lastUpdatedAt: Date?
-    /// Set when a newer GitHub release is found, so the popover can offer a link.
-    public var availableUpdate: AvailableUpdate?
 
     public init(readings: [InverterReading] = []) {
         self.readings = readings

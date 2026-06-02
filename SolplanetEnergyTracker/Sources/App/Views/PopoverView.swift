@@ -6,9 +6,14 @@ import SolplanetEnergyTrackerLib
 struct PopoverView: View {
     let store: ReadingsStore
     let historyReader: HistoryReader
+    let updateState: UpdateState
     var onRefresh: () -> Void
     var onOpenSettings: () -> Void
     var onQuit: () -> Void
+    var onInstallUpdate: () -> Void
+    var onRestartUpdate: () -> Void
+    var onSkipUpdate: () -> Void
+    var onLaterUpdate: () -> Void
 
     private enum Mode: String, CaseIterable, Identifiable {
         case now = "Now"
@@ -20,8 +25,16 @@ struct PopoverView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             header
-            if let update = store.availableUpdate {
-                updateBanner(update)
+            if let update = updateState.pendingUpdate {
+                UpdateAvailableBanner(
+                    update: update,
+                    installationKind: updateState.installationKind,
+                    phase: updateState.phase,
+                    onInstall: onInstallUpdate,
+                    onRestart: onRestartUpdate,
+                    onSkip: onSkipUpdate,
+                    onLater: onLaterUpdate
+                )
             }
             if store.primary != nil {
                 Picker("View", selection: $mode) {
@@ -133,21 +146,6 @@ struct PopoverView: View {
             Button("Settings…", action: onOpenSettings)
             Button("Quit", action: onQuit)
         }
-    }
-
-    private func updateBanner(_ update: AvailableUpdate) -> some View {
-        Link(destination: URL(string: update.url) ?? Self.sponsorURL) {
-            HStack(spacing: 6) {
-                Image(systemName: "arrow.down.circle.fill")
-                Text("Version \(update.version) is available — view release")
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            .font(.caption)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(8)
-            .background(Color.accentColor.opacity(0.15), in: RoundedRectangle(cornerRadius: 8))
-        }
-        .buttonStyle(.plain)
     }
 
     private func updatedLabel(_ date: Date) -> String {

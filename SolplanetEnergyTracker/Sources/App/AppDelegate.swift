@@ -94,7 +94,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // NSHostingController drives the window to its view's fitting size,
             // which collapses a Form/TabView to ~zero height. Use an explicit
             // content rect + NSHostingView so the window keeps a usable size.
-            let contentRect = NSRect(x: 0, y: 0, width: 460, height: 360)
+            let contentRect = NSRect(x: 0, y: 0, width: 460, height: 560)
             let window = NSWindow(
                 contentRect: contentRect,
                 styleMask: [.titled, .closable],

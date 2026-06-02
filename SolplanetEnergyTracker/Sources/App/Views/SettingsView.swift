@@ -14,9 +14,10 @@ struct SettingsView: View {
             GeneralSettingsView(preferences: preferences)
                 .tabItem { Label("General", systemImage: "gearshape") }
         }
-        // Explicit height: hosted in a plain NSWindow (not the Settings scene), a
+        // Explicit size: hosted in a plain NSWindow (not the Settings scene), a
         // Form/TabView reports no intrinsic height and the content collapses.
-        .frame(width: 460, height: 360)
+        // Height fits the tallest tab (General) without a vertical scrollbar.
+        .frame(width: 460, height: 560)
     }
 }
 
@@ -117,6 +118,17 @@ private struct GeneralSettingsView: View {
 
     var body: some View {
         Form {
+            Section("Startup") {
+                Toggle("Start automatically at login", isOn: $launchAtLogin)
+                    .onChange(of: launchAtLogin) { _, newValue in updateLaunchAtLogin(newValue) }
+                if let launchError {
+                    Text(launchError)
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+
             Section("Refresh") {
                 VStack(alignment: .leading) {
                     Text("Poll every \(Int(interval)) s")
@@ -143,17 +155,6 @@ private struct GeneralSettingsView: View {
             .onChange(of: menuOptions) { _, newValue in
                 preferences.menuBarDisplayOptions = newValue
                 NotificationCenter.default.post(name: .menuBarDisplayOptionsChanged, object: nil)
-            }
-
-            Section("Startup") {
-                Toggle("Start automatically at login", isOn: $launchAtLogin)
-                    .onChange(of: launchAtLogin) { _, newValue in updateLaunchAtLogin(newValue) }
-                if let launchError {
-                    Text(launchError)
-                        .font(.caption)
-                        .foregroundStyle(.orange)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
             }
         }
         .formStyle(.grouped)

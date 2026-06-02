@@ -153,6 +153,84 @@ adapting names. Trigger on `push` of tags matching `v*.*.*`.
   must accept the bundle's `CFBundleShortVersionString` and the tag's stripped
   form identically.
 
+### 3.1. Release-publishing script (`scripts/publish-release.sh`)
+
+**Status: ❌ Not started.** The workflow above fires on a pushed `vX.Y.Z` tag.
+The whole point of a script is to make cutting a release one safe command
+instead of a hand-typed `git tag && git push`, where a typo'd or duplicate tag
+quietly ships the wrong version. Add `scripts/publish-release.sh` (naming follows
+the existing `03_github.sh` / `build-app-bundle.sh` convention).
+
+**Usage:** `./scripts/publish-release.sh <version>` (e.g. `0.2.0`, or accept a
+bump keyword `patch|minor|major` and compute the next version from the latest
+tag).
+
+**Responsibilities (fail-fast, `set -euo pipefail`):**
+1. **Preconditions:** on `main`, working tree clean, `origin` reachable, `gh`
+   authenticated (reuse the checks already in `03_github.sh`).
+2. **Validate version:** must be SemVer; the `v$VERSION` tag must not already
+   exist locally or on the remote (`git ls-remote --tags`). Refuse to overwrite.
+3. **Monotonic check:** new version must be strictly greater than the latest
+   existing tag (parse with the same rules as `SemanticVersion`) — guards
+   against accidental downgrades the in-app checker would then ignore.
+4. **Local sanity build (optional, `--skip-build` to bypass):** run
+   `BUNDLE_VERSION=$VERSION ./scripts/build-app-bundle.sh` and `swift test` so a
+   broken build is caught before the tag is public, not in CI after.
+5. **Tag + push:** `git tag -a "v$VERSION" -m "Release v$VERSION"` then
+   `git push origin "v$VERSION"`. This push is what triggers Track A's
+   `release.yml`.
+6. **Confirm before push** (the tag push is the irreversible, outward-facing
+   step): print the version, the target tag, and the commit it points at, and
+   require explicit confirmation unless `--yes` is passed.
+7. **Follow-up:** print the Actions run URL (`gh run watch` / `gh release view`)
+   so the user can watch the build → release → tap-bump chain.
+
+**Notes:**
+- The script does **not** build/upload artifacts itself — that is CI's job
+  (keeps signing + release creation in one reproducible place). The script only
+  gates and triggers.
+- Keep version as the single source of truth: the tag drives `BUNDLE_VERSION`
+  drives `Info.plist`. The script must not write a version into any committed
+  file, to avoid drift.
+- Document it in `README.md` and reference it from §8.
+
+### 3.2. Release how-to doc (`docs/how-to/how-to-release.md`)
+
+**Status: ❌ Not started.** A short operator runbook so cutting a release does
+not depend on tribal memory. Create `docs/how-to/how-to-release.md` (new
+`docs/how-to/` directory). It documents **two paths to the same outcome** — both
+must produce a GitHub Release carrying `Solplanet-Energy-Tracker.zip` +
+`.sha256` and bump the tap cask:
+
+**Path A — Automatic (CI, the normal path).**
+1. Bump considerations: pick the next SemVer; nothing to edit by hand (version
+   comes from the tag).
+2. Run `./scripts/publish-release.sh <version>` (§3.1) — gates, tags, pushes.
+3. The pushed `vX.Y.Z` tag triggers `.github/workflows/release.yml` (§3): build →
+   `ditto` zip + sha256 → GitHub Release → `update-tap` bumps the cask.
+4. Verify: `gh release view vX.Y.Z`, confirm both assets attached, confirm the
+   tap commit landed, then `brew update && brew upgrade --cask solplanet-energy-tracker`.
+
+**Path B — Manual (local fallback, when CI is unavailable / broken).** The exact
+commands the CI runs, done by hand on a Mac:
+1. Clean tree on `main`; choose `VERSION`.
+2. `BUNDLE_VERSION=$VERSION ./scripts/build-app-bundle.sh` → `dist/...app`.
+3. `cd dist && ditto -c -k --keepParent "Solplanet Battery Energy Tracker.app" "Solplanet-Energy-Tracker.zip"`
+   then `shasum -a 256 ... > Solplanet-Energy-Tracker.zip.sha256`.
+4. `git tag -a v$VERSION -m "Release v$VERSION" && git push origin v$VERSION`.
+5. `gh release create v$VERSION --generate-notes dist/Solplanet-Energy-Tracker.zip dist/Solplanet-Energy-Tracker.zip.sha256`.
+6. **Tap bump by hand:** edit `Casks/solplanet-energy-tracker.rb` in
+   `ealliaume/homebrew-tap` — set `version` + the new `sha256` — commit, push.
+7. Same verification as Path A step 4.
+
+**Doc must also cover:**
+- The ad-hoc-signing / `no_quarantine` caveat and why first launch is safe.
+- Prerequisites: `gh` authenticated, push rights, the recent Xcode toolchain,
+  the `HOMEBREW_TAP_TOKEN` secret (CI) vs. tap push rights (manual).
+- Rollback: tags/releases are effectively immutable to consumers — to undo, ship
+  a higher patch version; do not delete/re-push a tag that users may have pulled.
+- A pointer back to this plan (§3, §3.1, §4) for the underlying machinery.
+
 ---
 
 ## 4. Track B — Homebrew tap (`ealliaume/homebrew-tap`)
@@ -270,6 +348,8 @@ Preserve those properties; do not regress them when renaming.
 |---|---|---|---|---|
 | H0 | Decide cask name, asset name, tap repo name; confirm app's support/cache/prefs paths | naming contract fixed | — | 🟡 Partial — names proposed here; owner/repo wired in `AppInfo`; on-disk paths still to confirm |
 | H1 | Track A release workflow + first `v0.1.0` tag | GitHub Release with zip+sha256 exists | H0 | ❌ Not started |
+| H1b | `scripts/publish-release.sh` — gate + tag + push to trigger H1 (§3.1) | one-command, typo-safe releases | H1 | ❌ Not started |
+| H1c | `docs/how-to/how-to-release.md` — automatic (CI) + manual (local) runbook (§3.2) | release process documented, repeatable | H1, H2 | ❌ Not started |
 | H2 | Track B tap repo + cask; `HOMEBREW_TAP_TOKEN` secret; wire `update-tap` job | `brew install --cask` works end to end | H1 | ❌ Not started |
 | H3 | Manual `brew upgrade --cask` verified to swap a running app | upgrade path proven by hand | H2 | ❌ Not started |
 | H4 | Port `Updates/` core (checker, detector, version) + tests | app *detects* updates, logs them | H1 | 🟡 Partial — version + check-only checker + tests + poll loop done; **detector + rich `AvailableUpdate` assets** missing |

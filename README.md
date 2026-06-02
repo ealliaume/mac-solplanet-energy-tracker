@@ -46,6 +46,32 @@ flow (it runs `brew upgrade --cask` for you when installed via the tap, or
 downloads and swaps the bundle otherwise). You can also `brew upgrade --cask
 solplanet-energy-tracker` by hand.
 
+### App won't launch — *"Apple could not verify…"*
+
+The app is ad-hoc signed, so macOS Gatekeeper blocks the first launch with a
+warning like **"Apple could not verify 'Solplanet Battery Energy Tracker' is free
+of malware…"**. Pick whichever is easiest:
+
+**Right-click open (easiest)** — In Finder, locate the app, right-click it →
+**Open** → **Open** in the dialog. macOS remembers the approval; it launches
+normally from then on.
+
+**System Settings** — After a blocked launch: **System Settings** → **Privacy &
+Security** → scroll down → click **Open Anyway**.
+
+**CLI — strip the quarantine flag**:
+
+```sh
+xattr -dr com.apple.quarantine "/Applications/Solplanet Battery Energy Tracker.app"
+```
+
+For a cask install the quarantine attribute comes from the download. Clear it,
+then launch:
+
+```sh
+xattr -cr "/Applications/Solplanet Battery Energy Tracker.app"
+open "/Applications/Solplanet Battery Energy Tracker.app"
+```
 
 ### Build from source
 

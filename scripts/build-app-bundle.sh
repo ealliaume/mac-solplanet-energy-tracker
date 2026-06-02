@@ -22,12 +22,13 @@ MACOS_DIR="$CONTENTS/MacOS"
 RESOURCES_DIR="$CONTENTS/Resources"
 BUILD_CONFIG="release"
 
-echo "→ Building release binaries"
+echo "→ Building release binaries (universal: arm64 + x86_64)"
 cd "$PACKAGE_DIR"
-swift build -c "$BUILD_CONFIG" --product "$APP_BINARY_NAME"
-swift build -c "$BUILD_CONFIG" --product IconExporter
+ARCH_FLAGS=(--arch arm64 --arch x86_64)
+swift build -c "$BUILD_CONFIG" "${ARCH_FLAGS[@]}" --product "$APP_BINARY_NAME"
+swift build -c "$BUILD_CONFIG" "${ARCH_FLAGS[@]}" --product IconExporter
 
-BIN_PATH="$(swift build -c "$BUILD_CONFIG" --show-bin-path)"
+BIN_PATH="$(swift build -c "$BUILD_CONFIG" "${ARCH_FLAGS[@]}" --show-bin-path)"
 APP_BIN="$BIN_PATH/$APP_BINARY_NAME"
 ICON_EXPORTER_BIN="$BIN_PATH/IconExporter"
 

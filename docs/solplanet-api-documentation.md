@@ -93,7 +93,7 @@ A response with `"flg":0` means that sub-device is **disabled / not reporting**;
 
 | Field | Meaning | Unit / scaling | Notes |
 |-------|---------|----------------|-------|
-| `pac` | Inverter AC power | W | `<0` = exporting to AC bus (house + grid), `>0` = drawing from AC. **Includes battery discharge contribution.** Used to derive PV. |
+| `pac` | Inverter AC power | W | `<0` = exporting to AC bus, `>0` = drawing from AC. This is the **total** PV output (battery is AC-coupled and charges from this bus), so **`PV = -pac`**. |
 | `sac` | Apparent power | VA | |
 | `qac` | Reactive power | var | |
 | `pf` | Power factor | ×100 | e.g. `83` → 0.83 |
@@ -141,56 +141,66 @@ reading (PV 841, battery 421 **charging** ⇒ `pb = -421`).
 fields `vpv`/`ipv` (device=2) also read `0`. The community confirms *"no standard
 method for separating PV-only power is documented."*
 
-PV is therefore reconstructed from the energy balance — PV feeds the battery
-(`battery_charge = -pb`) and the AC bus (`inverter_export = -pac`):
+**The battery is AC-coupled.** PV is converted to AC by the inverter and put on the
+AC bus; the battery charges *from* that bus, alongside the house and grid. So the
+inverter's AC output (`-pac`) is the **total** PV delivered — it already includes the
+battery-charging power:
 
 ```
-PV = -(pb + pac)   = battery_charge + inverter_export
-   = -(  pb_device4  +  pac_device2 )
+PV = -pac        (inverter AC output, device=2)
 ```
 
-Clamp the result at `0`: when PV is absent (e.g. night) the battery *discharges*
-to feed the AC bus, so `pb` and `pac` have opposite signs and cancel toward `0`.
-
-**Validation against the Solplanet app (PV reading):**
-
-| | app PV | `pb` | `pac` | `-(pb + pac)` |
-|---|-------:|-----:|------:|--------------:|
-| high-PV event | ~2791 W | −871 | −967 | **1838 W** ✓ (app lags ~2 min; PV was falling) |
-| original full reading | 841 W | −421 | −420 | **841 W** ✓ (also reproduces load 425, grid 5) |
-
-> ⚠️ Beware near-zero moments: a low live PV cross-checked against a lagging app
-> reading can look like a match under the *wrong* sign. The high-PV event above is
-> the decisive test — the inverted formula (`pb + pac`) would report **0 W** there.
-
-### Why house load & grid can't be derived
-
-With the grid CT meter disabled (`device=3 flg:0`), there is **one equation and two
-unknowns** (house load and grid flow), so they cannot be separated locally:
+The AC bus splits that output into its sinks:
 
 ```
-node balance:  PV + grid_import = house_load + battery_charge + grid_export
+PV  =  battery_charge  +  house_load  +  grid_export  -  grid_import     (all AC)
 ```
 
-To recover them, enable the smart meter (Solplanet app / installer menu) so
-`device=3` reports, then:
+Clamp PV at `0` (negative `-pac` = the inverter is importing, no PV).
+
+> ⚠️ **Do NOT use `-(pb + pac)`** — that adds the battery charge a second time
+> (it is already inside `-pac`) and roughly *doubles* the result.
+
+**Validation against the Solplanet app:**
+
+| | app PV | `pac` | `-pac` | `-(pb+pac)` (wrong) |
+|---|-------:|------:|-------:|--------------------:|
+| high-PV event | 4801 W | −4274 | **4274 W** ✓ (app lags ~2 min; PV falling) | 8303 W ✗ (~1.7×) |
+
+The decisive proof: while PV was *falling* (SOC climbing, clouds), `-(pb+pac)`
+read *higher* than the lagging app value — impossible for a correct formula, so it
+is structurally wrong. `-pac` read *below* the app value, consistent with the drop.
+
+The app's own four numbers are internally exact and lag-free, which pins the model:
+`4801 = 4380 (batt) + 400 (load) + 21 (grid export)`.
+
+### Why house load & grid can't be derived (without the meter)
+
+When charging hard, `PV ≈ battery_charge` (the house+grid remainder is small), so
+house load is the **tiny difference of two large numbers** — and `pb` (device=4)
+and `pac` (device=2) refresh on *different* cadences (device=2 can lag 60 s+). That
+makes the difference far too noisy to trust:
 
 ```
-house_load = PV + pb - grid_export     (battery_charge = -pb; grid = device=3 meter)
+house_load = PV + pb - grid_export        (battery_charge ≈ -pb; grid = device=3)
 ```
+
+Enable the grid CT meter (`device=3`, Solplanet app / installer menu) for a usable
+grid figure; house load is then `PV + pb - grid_export` (still ±battery charge
+efficiency, ~8%).
 
 ---
 
 ## Worked example (live snapshot, high-PV)
 
 ```
-device=4: ppv=0  pb=-871  soc=54  vb=5280  vbinv=5320  cb=-224
-device=2: pac=-967
+device=4: ppv=0  pb=-4029  soc=55  vb=5330  cb=-756
+device=2: pac=-4274
 
-PV       = -(pb + pac) = -(-871 + -967) = 1838 W
-Battery  = 871 W charging (pb<0), 54%, 52.80 V
-Inverter = 967 W exporting to AC bus (pac<0)
-Load/Grid= unavailable (meter disabled)
+PV       = -pac = 4274 W            (app showed 4801, lagging/falling)
+Battery  = 4029 W charging (pb<0), 55%, 53.30 V
+House    = PV + pb = 245 W  (rough; small noisy diff - needs meter)
+Grid     = unavailable (meter disabled)
 ```
 
 This repo's `scripts/battery_status.sh` implements exactly this logic.

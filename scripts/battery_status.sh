@@ -46,39 +46,40 @@ meter = json.loads(os.environ["METER_JSON"])
 # Sign conventions (verified against the Solplanet app):
 #   pb  < 0 = battery charging, > 0 = discharging
 #   pac < 0 = inverter exporting to AC bus, > 0 = drawing from AC
-# ess["ppv"] is dead on this firmware (always 0), so PV is reconstructed from the
-# energy balance  PV = battery_charge + inverter_export = -(pb + pac):
-#   - now:      -(-871 + -967) = 1838 W   (app showed ~2791, lagging/falling)
-#   - original: -(-421 + -420) =  841 W   (matches app 841, load 425, grid 5)
+#
+# The battery is AC-COUPLED: PV feeds the inverter's AC bus, and the battery
+# charges *from* that bus. So the inverter AC output (-pac) already INCLUDES the
+# battery-charging power -> PV = -pac. (Do NOT add pb; that double-counts.)
+# Confirmed at high PV: app PV 4801 W, -pac ~4274 (lagging/falling); the old
+# -(pb+pac) gave ~8300 W, ~1.7x too high.  ess["ppv"] is dead (always 0).
 soc = ess.get("soc", 0)           # state of charge, %
 pb  = ess.get("pb", 0)            # battery power, W  (<0 charge, >0 discharge)
 vb  = ess.get("vb", 0) / 100.0    # battery voltage, V
 pac = inv.get("pac", 0)           # inverter AC power, W (<0 export, >0 import)
 
-pv  = -(pb + pac)                 # derived PV generation, W
-if pv < 0:                        # opposite-sign cancel = no PV (e.g. night)
-    pv = 0
+pv  = max(0, -pac)                # derived PV generation, W (inverter AC output)
 
 batt = "charging" if pb < 0 else ("discharging" if pb > 0 else "idle")
 
-UNAVAIL = "n/a (grid meter disabled)"
-
-# House load + grid flow require the grid CT meter (device=3). It is disabled on
-# this install (flg=0); when present we split them via the node balance:
+# House load = PV - battery_charge - grid_export.  This is a small difference of
+# two large, asynchronously-sampled values (PV ~= battery when charging hard), so
+# it is too noisy to derive reliably without the grid CT meter (device=3), which
+# is disabled here (flg=0). With the meter present it becomes usable:
 #     PV + grid_import = house_load + battery_charge + grid_export
-#   => house_load = PV + pb - grid_export   (battery_charge = -pb)
+#   => house_load = PV + pb - grid_export        (battery_charge ~= -pb)
 # ASSUMPTION (unverified - meter offline here): meter "pac" > 0 = export, < 0 = import.
 if meter.get("flg", 0) == 1:
     grid = meter.get("pac", 0)               # signed: >0 export, <0 import
-    load = pv + pb - grid                     # house load, W
+    load = pv + pb - grid                     # house load, W (~ +/- charge effcy)
     gridflow = "export" if grid > 0 else ("import" if grid < 0 else "idle")
     load_str = f"{load:6d} W"
     grid_str = f"{abs(grid):6d} W   {gridflow}"
 else:
-    load_str = UNAVAIL
-    grid_str = UNAVAIL
+    # rough only: tiny difference of two large async values; expect big jitter
+    load_str = f"~{max(0, pv + pb):5d} W   (rough; needs grid meter)"
+    grid_str = "   n/a   (grid meter disabled)"
 
-print(f"  PV production     : {pv:6d} W   (derived: battery + inverter)")
+print(f"  PV production     : {pv:6d} W   (= inverter AC output, -pac)")
 print(f"  Battery flow      : {abs(pb):6d} W   {batt}   ({soc}%, {vb:.2f} V)")
 print(f"  House load        : {load_str}")
 print(f"  Grid flow         : {grid_str}")

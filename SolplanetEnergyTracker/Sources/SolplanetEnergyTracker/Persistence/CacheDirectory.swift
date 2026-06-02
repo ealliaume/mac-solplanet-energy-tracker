@@ -26,6 +26,10 @@ public struct CacheDirectory: Sendable {
     public var readingsLockURL: URL { root.appendingPathComponent("readings.json.lock") }
     public var historyDirectory: URL { root.appendingPathComponent("history", isDirectory: true) }
 
+    /// Logs live directly under the root (`app.log`, `solplanet-connector.log`).
+    public var appLogURL: URL { root.appendingPathComponent("app.log") }
+    public var connectorLogURL: URL { root.appendingPathComponent("solplanet-connector.log") }
+
     /// `history/YYYY/MM/YYYY-MM-DD.jsonl` for the given day (UTC components).
     public func historyFileURL(for date: Date, calendar: Calendar = .current) -> URL {
         let components = calendar.dateComponents([.year, .month, .day], from: date)

@@ -8,6 +8,11 @@ import Observation
 @Observable
 public final class ReadingsStore {
     public private(set) var readings: [InverterReading] = []
+    /// Wall-clock time a fresh reading was last received (not the dongle's `tim`).
+    /// Drives the "Updated X ago" footer so it resets the moment data arrives.
+    public private(set) var lastUpdatedAt: Date?
+    /// Set when a newer GitHub release is found, so the popover can offer a link.
+    public var availableUpdate: AvailableUpdate?
 
     public init(readings: [InverterReading] = []) {
         self.readings = readings
@@ -19,8 +24,20 @@ public final class ReadingsStore {
     /// Menu-bar label text for the current primary reading.
     public var menuBarText: String { MenuBarSummary.text(for: primary) }
 
-    /// Insert or replace by `host:serialNumber`, preserving order.
-    public func update(_ reading: InverterReading) {
+    /// A fresh reading arrived: insert/replace by `host:serialNumber` and stamp
+    /// the receive time.
+    public func update(_ reading: InverterReading, receivedAt: Date = Date()) {
+        store(reading)
+        lastUpdatedAt = receivedAt
+    }
+
+    /// Replace a reading with its dimmed/offline copy without touching
+    /// `lastUpdatedAt` — a failed poll is not fresh data.
+    public func markOffline(_ reading: InverterReading) {
+        store(reading)
+    }
+
+    private func store(_ reading: InverterReading) {
         if let index = readings.firstIndex(where: { $0.id == reading.id }) {
             readings[index] = reading
         } else {

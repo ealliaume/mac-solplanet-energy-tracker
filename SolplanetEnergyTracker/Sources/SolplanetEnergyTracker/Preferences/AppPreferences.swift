@@ -11,6 +11,8 @@ public protocol AppPreferences: AnyObject, Sendable {
     var refreshIntervalSeconds: TimeInterval { get set }
     /// Which metrics the menu-bar label shows.
     var menuBarDisplayOptions: MenuBarDisplayOptions { get set }
+    /// Whether to check GitHub for a newer release in the background.
+    var updatesAutoCheckEnabled: Bool { get set }
 }
 
 public extension Notification.Name {
@@ -40,6 +42,7 @@ public final class UserDefaultsAppPreferences: AppPreferences, @unchecked Sendab
         static let inverters = "solplanet-tracker.connection.inverters"
         static let refreshInterval = "solplanet-tracker.refreshIntervalSeconds"
         static let menuBarDisplayOptions = "solplanet-tracker.menuBarDisplayOptions"
+        static let updatesAutoCheckEnabled = "solplanet-tracker.updatesAutoCheckEnabled"
     }
 
     /// Process-wide instance shared by the poll pipeline (AppDelegate) and the
@@ -85,5 +88,11 @@ public final class UserDefaultsAppPreferences: AppPreferences, @unchecked Sendab
             guard let data = try? encoder.encode(newValue) else { return }
             defaults.set(data, forKey: Key.menuBarDisplayOptions)
         }
+    }
+
+    public var updatesAutoCheckEnabled: Bool {
+        // Defaults to on when never set.
+        get { defaults.object(forKey: Key.updatesAutoCheckEnabled) as? Bool ?? true }
+        set { defaults.set(newValue, forKey: Key.updatesAutoCheckEnabled) }
     }
 }

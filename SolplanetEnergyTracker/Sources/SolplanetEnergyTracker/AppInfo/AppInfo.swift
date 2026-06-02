@@ -19,6 +19,20 @@ public enum AppInfo {
     /// Text shown in the menu bar before any inverter is configured. Tapping the
     /// item opens Settings so the user can enter the dongle IP / serial number.
     public static let unconfiguredLabel = "Configure inverter"
+
+    /// GitHub coordinates used by the update checker and the releases link.
+    public static let repoOwner = "ealliaume"
+    public static let repoName = "mac-solplanet-energy-tracker"
+    public static var releasesURL: String { "https://github.com/\(repoOwner)/\(repoName)/releases" }
+
+    /// Running build's marketing version (`CFBundleShortVersionString`), or a zero
+    /// fallback when run as a bare binary outside a bundle.
+    public static var currentVersion: String {
+        (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String) ?? "0.0.0"
+    }
+
+    /// Environment variable that overrides the log level (e.g. `debug`).
+    public static let logLevelEnvKey = "SOLPLANET_TRACKER_LOG_LEVEL"
 }
 
 /// Hard limits on how the poller may talk to the dongle.

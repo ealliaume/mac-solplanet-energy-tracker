@@ -20,6 +20,9 @@ struct PopoverView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             header
+            if let update = store.availableUpdate {
+                updateBanner(update)
+            }
             if store.primary != nil {
                 Picker("View", selection: $mode) {
                     ForEach(Mode.allCases) { Text($0.rawValue).tag($0) }
@@ -44,6 +47,8 @@ struct PopoverView: View {
             }
             Divider()
             footer
+            supportLink
+                .frame(maxWidth: .infinity, alignment: .center)
         }
         .padding(16)
         .frame(width: 320)
@@ -72,7 +77,7 @@ struct PopoverView: View {
         } else if let code = reading.health.errorCode {
             banner("Inverter error code \(code).", color: .orange, icon: "exclamationmark.triangle")
         } else if !reading.health.meterEnabled {
-            banner("Grid & exact load need the CT meter (enable it in the Solplanet app).",
+            banner("Grid & exact load need the CT meter (enable it in the Solplanet mobile app).",
                    color: .secondary, icon: "bolt.badge.questionmark")
         }
     }
@@ -120,14 +125,52 @@ struct PopoverView: View {
             }
             .buttonStyle(.borderless)
             .help("Refresh now")
-            if let reading = store.primary, let date = reading.takenAt.date {
-                Text("Updated \(date.formatted(.relative(presentation: .numeric)))")
+            if let updatedAt = store.lastUpdatedAt {
+                Text("Updated \(updatedLabel(updatedAt))")
                     .font(.caption).foregroundStyle(.secondary)
             }
             Spacer()
             Button("Settings…", action: onOpenSettings)
             Button("Quit", action: onQuit)
         }
+    }
+
+    private func updateBanner(_ update: AvailableUpdate) -> some View {
+        Link(destination: URL(string: update.url) ?? Self.sponsorURL) {
+            HStack(spacing: 6) {
+                Image(systemName: "arrow.down.circle.fill")
+                Text("Version \(update.version) is available — view release")
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .font(.caption)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(8)
+            .background(Color.accentColor.opacity(0.15), in: RoundedRectangle(cornerRadius: 8))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func updatedLabel(_ date: Date) -> String {
+        // Within a few seconds the relative formatter says "in 0 seconds"; show a
+        // friendlier "just now" instead so a manual refresh reads cleanly.
+        if Date().timeIntervalSince(date) < 5 { return "just now" }
+        return date.formatted(.relative(presentation: .numeric))
+    }
+
+    /// GitHub Sponsors' heart colour (#DB61A2).
+    private static let sponsorPink = Color(red: 0.859, green: 0.380, blue: 0.635)
+    private static let sponsorURL = URL(string: "https://github.com/sponsors/ealliaume")! // known-valid literal
+
+    private var supportLink: some View {
+        Link(destination: Self.sponsorURL) {
+            HStack(spacing: 4) {
+                Image(systemName: "heart.fill").foregroundStyle(Self.sponsorPink)
+                Text("Support this project")
+            }
+            .font(.caption)
+        }
+        .buttonStyle(.plain)
+        .help("Support this project on GitHub Sponsors")
     }
 }
 

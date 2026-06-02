@@ -73,6 +73,17 @@ final class ReadingsStoreTests: XCTestCase {
         XCTAssertEqual(store.primary?.battery.soc.value, 80)
     }
 
+    func testUpdateStampsLastUpdatedButOfflineDoesNot() {
+        let store = ReadingsStore()
+        XCTAssertNil(store.lastUpdatedAt)
+        let received = Date(timeIntervalSince1970: 1_000)
+        store.update(sampleReading(), receivedAt: received)
+        XCTAssertEqual(store.lastUpdatedAt, received)
+        // An offline replacement must not move the "last updated" stamp.
+        store.markOffline(sampleReading(online: false))
+        XCTAssertEqual(store.lastUpdatedAt, received)
+    }
+
     func testMenuBarTextReflectsPrimary() {
         let store = ReadingsStore()
         XCTAssertEqual(store.menuBarText, AppInfo.unconfiguredLabel)

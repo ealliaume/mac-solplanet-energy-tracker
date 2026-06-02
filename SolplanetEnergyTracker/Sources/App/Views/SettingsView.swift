@@ -115,6 +115,7 @@ private struct GeneralSettingsView: View {
     @State private var launchAtLogin = false
     @State private var launchError: String?
     @State private var menuOptions = MenuBarDisplayOptions.default
+    @State private var autoCheckUpdates = true
 
     var body: some View {
         Form {
@@ -127,6 +128,10 @@ private struct GeneralSettingsView: View {
                         .foregroundStyle(.orange)
                         .fixedSize(horizontal: false, vertical: true)
                 }
+                Toggle("Check for updates automatically", isOn: $autoCheckUpdates)
+                    .onChange(of: autoCheckUpdates) { _, newValue in
+                        preferences.updatesAutoCheckEnabled = newValue
+                    }
             }
 
             Section("Refresh") {
@@ -162,6 +167,7 @@ private struct GeneralSettingsView: View {
             interval = preferences.refreshIntervalSeconds
             launchAtLogin = LaunchAtLoginService.shared.isEnabled
             menuOptions = preferences.menuBarDisplayOptions
+            autoCheckUpdates = preferences.updatesAutoCheckEnabled
         }
     }
 

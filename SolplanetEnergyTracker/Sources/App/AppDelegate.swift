@@ -16,8 +16,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let cacheDirectory = CacheDirectory.makeDefault()
     private lazy var store = ReadingsStore(readings: (try? ReadingsFileManager(directory: cacheDirectory).read()) ?? [])
     private var runner: PollerRunner?
+    private lazy var pidGuard = PidGuard(pidFileURL: cacheDirectory.root.appendingPathComponent("app.pid"))
+    private lazy var logger = FileLogger(
+        fileURL: cacheDirectory.appLogURL,
+        minLevel: LogLevel.parse(ProcessInfo.processInfo.environment[AppInfo.logLevelEnvKey]) ?? .info
+    )
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Single-instance: if another live copy already owns the pid file, bow out.
+        if case .alreadyRunning(let pid) = (try? pidGuard.acquire()) {
+            log(.warning, "another instance is running (pid \(pid)); exiting")
+            NSApp.terminate(nil)
+            return
+        }
+
         // Menubar-only: no Dock icon, no app-switcher entry. Pairs with
         // LSUIElement=true in the bundled Info.plist (set by the dist script).
         NSApp.setActivationPolicy(.accessory)
@@ -26,9 +38,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             NSApp.applicationIconImage = icon
         }
 
+        log(.info, "launched \(AppInfo.displayName) \(AppInfo.currentVersion)")
+        purgeOldLogs()
         seedInverterFromEnvironmentIfNeeded()
         installStatusItem()
         startPolling()
+        startUpdateChecks()
 
         // Re-render the label immediately when the user edits the display options.
         NotificationCenter.default.addObserver(
@@ -39,8 +54,52 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        pidGuard.release()
         let runner = runner
         Task { await runner?.stop() }
+    }
+
+    // MARK: logging
+
+    private func log(_ level: LogLevel, _ message: String) {
+        let logger = logger
+        Task { await logger.log(level, message) }
+    }
+
+    private func purgeOldLogs() {
+        let directory = cacheDirectory.root
+        Task.detached { LogCleaner(directory: directory).purge() }
+    }
+
+    // MARK: updates
+
+    private func startUpdateChecks() {
+        guard preferences.updatesAutoCheckEnabled else { return }
+        let checker = UpdateChecker(
+            httpClient: URLSession.shared,
+            owner: AppInfo.repoOwner,
+            repo: AppInfo.repoName
+        )
+        Task { [weak self] in
+            // Check now, then once a day while the app runs.
+            let oneDay: UInt64 = 24 * 60 * 60 * 1_000_000_000
+            while !Task.isCancelled {
+                await self?.runUpdateCheck(checker)
+                try? await Task.sleep(nanoseconds: oneDay)
+            }
+        }
+    }
+
+    private func runUpdateCheck(_ checker: UpdateChecker) async {
+        do {
+            let status = try await checker.check(currentVersion: AppInfo.currentVersion)
+            if case .updateAvailable(let version, let url) = status {
+                store.availableUpdate = AvailableUpdate(version: version.description, url: url)
+                log(.info, "update available: \(version)")
+            }
+        } catch {
+            log(.info, "update check skipped: \(error)")
+        }
     }
 
     // MARK: status item
@@ -143,8 +202,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         switch outcome {
         case .success(let reading):
             store.update(reading)
-        case .offline(_, let lastGood):
-            if let lastGood { store.update(lastGood.markedOffline()) }
+        case .offline(let reason, let lastGood):
+            log(.warning, "poll offline: \(reason)")
+            if let lastGood { store.markOffline(lastGood.markedOffline()) }
         }
         refreshTitle()
     }

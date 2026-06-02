@@ -1,6 +1,6 @@
 # Bootstrap plan — Solplanet Energy Tracker (macOS menu bar app)
 
-> **Status:** in progress — M0–M3 + M5 + M6 + M9 shipped; M4 (color logic only), M7, M8 outstanding. See §15 for the per-milestone table. Last updated 2026-06-02.
+> **Status:** in progress — M0–M3 + M5 + M6 + M7 shipped; M9 partial; M4 (color logic only) and M8 outstanding. See §15 for the per-milestone table. Last updated 2026-06-02.
 > **Author:** initial capture 2026-06-02.
 > **Reference codebase:** `/Users/ealliaume/private/git/mac-ai-trackers` ("AI Usages Tracker").
 > **API reference:** [`docs/solplanet-api-documentation.md`](../solplanet-api-documentation.md) (the live inverter local API, reverse-engineered).
@@ -328,7 +328,7 @@ Legend: ✅ shipped · 🟡 partial · ⬜ not started.
 | **M4 — Menu bar** | 🟡 | `PowerTier` color logic shipped. Menu bar currently renders plain text `☀ PV  🔋 SOC`; rasterized per-segment colored `NSImage` (`MenuBarLabelRenderer`, `MenuBarSegmentResolver`, seeding) still TODO. | Configurable colored segments render live (PV/SOC/Battery/Load/Grid). |
 | **M5 — Popover** | ✅ | Metric rows, health banner, footer. *(Energy-flow hero card + gauges still TODO.)* | Popover shows live data + health states. |
 | **M6 — Charts** | ✅ | `HistoryReader`, `ChartSeriesResolver` (gap-aware), `EnergyHistoryChartView` (Swift Charts), metric + window pickers. | Charts render across all time windows with gap-aware lines. |
-| **M7 — Settings + lifecycle** | 🟡 | Connection + General settings tabs shipped, preferences take effect live. Launch-at-login, logging+rotation+retention, PID guard, self-update still TODO. | Feature-complete v1; preferences take effect live. |
+| **M7 — Settings + lifecycle** | ✅ | Connection + General tabs (live prefs), launch-at-login, **logging** (`FileLogger` 5 MB rotation + `LogCleaner` 7-day purge, `SOLPLANET_TRACKER_LOG_LEVEL` override), **PID guard** (single instance), **self-update checker** (GitHub releases, surfaced in popover + General toggle). | Feature-complete v1; preferences take effect live. |
 | **M8 — Added features** | ⬜ | Energy-today/self-sufficiency (in scope); notifications + tariff deferred per §17. | Opt-in features shipping behind settings. |
 | **M9 — Build/dist** | 🟡 | `scripts/build-app-bundle.sh` → ad-hoc-signed `dist/Solplanet Battery Energy Tracker.app` with `.icns`, LSUIElement, NSLocalNetworkUsageDescription. README/screenshots + distribution decision still TODO. | `dist/Solplanet Battery Energy Tracker.app` launches; docs updated. |
 

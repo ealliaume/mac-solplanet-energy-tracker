@@ -59,6 +59,10 @@ jobs:
           p = pathlib.Path('SolplanetEnergyTracker/Package.swift')
           s = p.read_text()
           s = re.sub(r',\s*plugins:\s*\[[^\]]*\]', '', s)
+          # Also drop the SwiftLintPlugins package dependency itself; leaving it
+          # pulls the SwiftLintBinary artifactbundle, which crashes SwiftPM
+          # (SIGTRAP) under a universal '--arch arm64 --arch x86_64' build.
+          s = re.sub(r'^\s*\.package\(url:\s*\"https://github.com/SimplyDanny/SwiftLintPlugins\".*\n', '', s, flags=re.MULTILINE)
           p.write_text(s)
           "
           echo "--- Patched Package.swift ---"

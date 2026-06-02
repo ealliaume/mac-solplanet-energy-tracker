@@ -111,6 +111,8 @@ private struct GeneralSettingsView: View {
     let preferences: any AppPreferences
 
     @State private var interval: Double = PollingLimits.defaultRefreshInterval
+    @State private var launchAtLogin = false
+    @State private var launchError: String?
 
     var body: some View {
         Form {
@@ -127,8 +129,33 @@ private struct GeneralSettingsView: View {
                         .foregroundStyle(.secondary)
                 }
             }
+
+            Section("Startup") {
+                Toggle("Start automatically at login", isOn: $launchAtLogin)
+                    .onChange(of: launchAtLogin) { _, newValue in updateLaunchAtLogin(newValue) }
+                if let launchError {
+                    Text(launchError)
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
         }
         .formStyle(.grouped)
-        .onAppear { interval = preferences.refreshIntervalSeconds }
+        .onAppear {
+            interval = preferences.refreshIntervalSeconds
+            launchAtLogin = LaunchAtLoginService.shared.isEnabled
+        }
+    }
+
+    private func updateLaunchAtLogin(_ enabled: Bool) {
+        do {
+            try LaunchAtLoginService.shared.setEnabled(enabled)
+            launchError = nil
+        } catch {
+            // Revert the toggle to the system's actual state so the UI never lies.
+            launchAtLogin = LaunchAtLoginService.shared.isEnabled
+            launchError = "Couldn't \(enabled ? "enable" : "disable") launch at login: \(error.localizedDescription)"
+        }
     }
 }

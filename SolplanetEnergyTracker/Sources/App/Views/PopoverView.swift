@@ -98,9 +98,6 @@ struct PopoverView: View {
                       value: PowerFormatting.short(reading.load.value))
             MetricRow(icon: "bolt.fill", label: "Grid",
                       value: reading.grid.available ? PowerFormatting.short(reading.grid.power) : "n/a")
-            if let energy = reading.energyToday {
-                MetricRow(icon: "leaf.fill", label: "Energy today", value: String(format: "%.1f kWh", energy.value))
-            }
             if let temp = reading.temperature {
                 MetricRow(icon: "thermometer.medium", label: "Inverter", value: String(format: "%.0f °C", temp.value))
             }
